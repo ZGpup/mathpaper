@@ -1,0 +1,1 @@
+"""Math module for mathpaper."""

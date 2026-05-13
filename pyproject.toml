@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mathpaper"
+version = "0.1.0"
+description = "A Python library for generating mathematical worksheets and problem sets"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Author Name", email = "author@example.com"}
+]
+requires-python = ">=3.9"
+dependencies = [
+    
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=22.0",
+    "isort>=5.0",
+    "flake8>=4.0",
+    "mypy>=0.9",
+]
+docs = [
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=1.0",
+]
+
+[tool.setuptools]
+packages = ["mathpaper"]
+
+[tool.setuptools.package-dir]
+"" = "src"

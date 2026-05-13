@@ -1,0 +1,1 @@
+"""Document parts and components."""
