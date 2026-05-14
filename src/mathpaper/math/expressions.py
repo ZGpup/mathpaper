@@ -9,18 +9,68 @@ import re
 from sympy import latex
 
 
+def _convert_fracs(s: str) -> str:
+    """Replace all \\frac{A}{B} with (A)/(B) using proper brace matching.
+
+    The simple regex approach breaks when A or B contain nested braces (e.g.
+    log arguments, exponents that weren't cleaned up). This walks the string
+    character by character to match balanced braces correctly.
+    """
+    result = []
+    i = 0
+    while i < len(s):
+        if s[i:i+6] == r'\frac{':
+            # find end of numerator brace group
+            depth, j = 0, i + 5
+            while j < len(s):
+                if s[j] == '{':
+                    depth += 1
+                elif s[j] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        break
+                j += 1
+            num_end = j
+            num = s[i + 6 : num_end]
+
+            # denominator brace group must follow immediately
+            if num_end + 1 < len(s) and s[num_end + 1] == '{':
+                depth, k = 0, num_end + 1
+                while k < len(s):
+                    if s[k] == '{':
+                        depth += 1
+                    elif s[k] == '}':
+                        depth -= 1
+                        if depth == 0:
+                            break
+                    k += 1
+                den = s[num_end + 2 : k]
+                result.append(f'({num})/({den})')
+                i = k + 1
+                continue
+
+        result.append(s[i])
+        i += 1
+    return ''.join(result)
+
+
 def sympy_to_typst(expr) -> str:
     """Convert a SymPy expression to a Typst math string.
 
-    Strategy: SymPy → latex() → regex fixups → Typst.
-    Covers polynomials, fractions, roots, and Greek letters.
+    Strategy: SymPy → latex() → fixups → Typst.
+    Covers polynomials, fractions, roots, logs, trig, and Greek letters.
     Extend the fixup list as new expression types are needed.
     """
     s = latex(expr)
 
-    # Sizing delimiters — Typst doesn't use \left/\right
-    s = s.replace(r"\left(", "(").replace(r"\right)", ")")
-    s = s.replace(r"\left|", "|").replace(r"\right|", "|")
+    # Sizing delimiters — Typst doesn't use \left/\right.
+    # SymPy sometimes emits \left ( (with a space) so use regex.
+    s = re.sub(r'\\left\s*\(', '(', s)
+    s = re.sub(r'\\right\s*\)', ')', s)
+    s = re.sub(r'\\left\s*\[', '[', s)
+    s = re.sub(r'\\right\s*\]', ']', s)
+    s = re.sub(r'\\left\s*\|', '|', s)
+    s = re.sub(r'\\right\s*\|', '|', s)
 
     # Roots: \sqrt{x} → sqrt(x)  (before exponents so sqrt{x^{2}} still works)
     s = re.sub(r'\\sqrt\{([^{}]+)\}', r'sqrt(\1)', s)
@@ -33,10 +83,24 @@ def sympy_to_typst(expr) -> str:
     s = re.sub(r'_\{(\w)\}', r'_\1', s)
     s = re.sub(r'_\{([^}]+)\}', r'_(\1)', s)
 
-    # Fractions: \frac{a}{b} → (a)/(b)
-    # Runs after exponent/subscript fixups so denominators like x + 3 y^{2}
-    # have already had their inner braces removed and are matchable.
-    s = re.sub(r'\\frac\{([^{}]+)\}\{([^{}]+)\}', r'(\1)/(\2)', s)
+    # Math functions: strip \cmd{...} braces added by SymPy around the arg
+    # parens, e.g. \log{(x)} → log(x).  Must run before _convert_fracs so
+    # these braces don't confuse brace matching inside fractions.
+    _funcs = (
+        "log|ln|exp|"
+        "sin|cos|tan|cot|sec|csc|"
+        "arcsin|arccos|arctan|arccot|arcsec|arccsc|"
+        "sinh|cosh|tanh|coth"
+    )
+    s = re.sub(rf'\\({_funcs})\{{([^{{}}]*)\}}', r'\1\2', s)
+    # Also handle bare \cmd without braces (e.g. \log x)
+    s = re.sub(rf'\\({_funcs})\b', r'\1', s)
+
+    # Multiplication dot: \cdot → space (juxtaposition is multiplication in Typst)
+    s = s.replace(r'\cdot', ' ')
+
+    # Fractions: \frac{A}{B} → (A)/(B), handles nested braces
+    s = _convert_fracs(s)
 
     # Greek letters: \alpha → alpha (strip backslash)
     _greek = (
@@ -46,5 +110,9 @@ def sympy_to_typst(expr) -> str:
         "Nu|Xi|Pi|Rho|Sigma|Tau|Upsilon|Phi|Chi|Psi|Omega"
     )
     s = re.sub(rf'\\({_greek})\b', r'\1', s)
+
+    # Strip spaces immediately inside parens — artifact of SymPy's \left ( ... \right )
+    s = re.sub(r'\(\s+', '(', s)
+    s = re.sub(r'\s+\)', ')', s)
 
     return s

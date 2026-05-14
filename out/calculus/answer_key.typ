@@ -50,7 +50,7 @@ Name: #box(width: 3in, line(length: 100%, stroke: 0.5pt))
 ]
 
 #block(breakable: false)[
-*4. (8 pts)* Given $2x^2 + x y + y^3 = 10$, use implicit differentiation to find $(d y)/(d x)$.
+*4. (8 pts)* Given $y = x^(y^x)$, use implicit differentiation to find $(d y)/(d x)$.
 
-#block(fill: luma(230), inset: 6pt, radius: 3pt)[*Answer:* $(d y)/(d x) = (- 4 x - y)/(x + 3 y^2)$]
+#block(fill: luma(230), inset: 6pt, radius: 3pt)[*Answer:* $(d y)/(d x) = - (x^(y^x - 1) y^(x + 1) (x log(x) log(y) + 1))/(x^(y^x + 1) y^x log(x) - y)$]
 ]

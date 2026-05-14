@@ -50,7 +50,7 @@ Name: #box(width: 3in, line(length: 100%, stroke: 0.5pt))
 ]
 
 #block(breakable: false)[
-*4. (8 pts)* Given $2x^2 + x y + y^3 = 10$, use implicit differentiation to find $(d y)/(d x)$.
+*4. (8 pts)* Given $y = x^(y^x)$, use implicit differentiation to find $(d y)/(d x)$.
 
 #v(2.5in)
 ]

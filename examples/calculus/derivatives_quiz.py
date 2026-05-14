@@ -2,10 +2,10 @@
 Calculus derivatives and implicit differentiation quiz.
 
 Every answer is computed from the expressions defined below.
-Change POLY_EXPR, IMPLICIT_CIRCLE_K, or IMPLICIT_ELLIPSE_K and both
+Change POLY_EXPR, CURVE_CIRCLE, or CURVE_MIXED and both
 the student worksheet and the answer key regenerate — no manual checking.
 """
-from sympy import symbols
+from sympy import Eq, symbols
 
 from mathpaper import Math, MultipartProblem, Part, PartsGrid, Problem, Test, Text
 from mathpaper.math import sympy_to_typst
@@ -19,12 +19,9 @@ from mathpaper.math.calculus import (
 x, y = symbols("x y")
 
 # ── Change these to produce a different quiz ───────────────────────────────
-POLY_EXPR         = x**4 - 8*x**2 + 7     # Problems 1 & 2
-
-IMPLICIT_CIRCLE_K = 25                     # Problem 3: x^2 + y^2 = K
-IMPLICIT_MIXED_A  = 2                      # Problem 4: Ax^2 + Bxy + y^3 = K
-IMPLICIT_MIXED_B  = 1
-IMPLICIT_MIXED_K  = 10
+POLY_EXPR    = x**4 - 8*x**2 + 7          # Problems 1 & 2
+CURVE_CIRCLE = Eq(x**2 + y**2, 25)        # Problem 3
+CURVE_MIXED  = Eq(y, x**(y**x))           # Problem 4
 # ──────────────────────────────────────────────────────────────────────────
 
 
@@ -77,12 +74,11 @@ p2 = MultipartProblem(
 # Problem 3 — implicit differentiation of a circle
 # x^2 + y^2 = 25  →  dy/dx = -x/y
 # ---------------------------------------------------------------------------
-F_circle  = x**2 + y**2 - IMPLICIT_CIRCLE_K
-p3_dydx   = implicit_derivative(F_circle)
+p3_dydx = implicit_derivative(CURVE_CIRCLE)
 
 p3 = Problem(
     prompt=Text(
-        f"Given $x^2 + y^2 = {IMPLICIT_CIRCLE_K}$, "
+        f"Given ${sympy_to_typst(CURVE_CIRCLE)}$, "
         "use implicit differentiation to find $(d y)/(d x)$."
     ),
     answer=Math(f"(d y)/(d x) = {sympy_to_typst(p3_dydx)}"),
@@ -93,19 +89,12 @@ p3 = Problem(
 
 # ---------------------------------------------------------------------------
 # Problem 4 — implicit differentiation of a mixed-term curve
-# 2x^2 + xy + y^3 = 10  →  dy/dx = -(4x + y) / (x + 3y^2)
 # ---------------------------------------------------------------------------
-F_mixed = (
-    IMPLICIT_MIXED_A * x**2
-    + IMPLICIT_MIXED_B * x * y
-    + y**3
-    - IMPLICIT_MIXED_K
-)
-p4_dydx = implicit_derivative(F_mixed)
+p4_dydx = implicit_derivative(CURVE_MIXED)
 
 p4 = Problem(
     prompt=Text(
-        f"Given $2x^2 + x y + y^3 = {IMPLICIT_MIXED_K}$, "
+        f"Given ${sympy_to_typst(CURVE_MIXED)}$, "
         "use implicit differentiation to find $(d y)/(d x)$."
     ),
     answer=Math(f"(d y)/(d x) = {sympy_to_typst(p4_dydx)}"),

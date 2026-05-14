@@ -20,16 +20,19 @@ def nth_derivative(expr, n: int, var: str = "x"):
     return diff(expr, x, n)
 
 
-def implicit_derivative(F, x_var: str = "x", y_var: str = "y"):
-    """Return dy/dx for the curve F(x, y) = 0 via implicit differentiation.
+def implicit_derivative(curve, x_var: str = "x", y_var: str = "y"):
+    """Return dy/dx for an implicitly defined curve via implicit differentiation.
 
-    Pass F as the expression equal to zero, e.g. for x^2 + y^2 = 25
-    pass F = x**2 + y**2 - 25.
+    Accepts either:
+    - a SymPy Eq, e.g. Eq(x**2 + y**2, 25)  ← preferred; use with sympy_to_typst
+    - an expression F equal to zero, e.g. x**2 + y**2 - 25
 
     Returns a simplified SymPy expression in terms of x and y.
     """
+    from sympy import Eq
     x = symbols(x_var)
     y = symbols(y_var)
+    F = curve.lhs - curve.rhs if isinstance(curve, Eq) else curve
     return simplify(-diff(F, x) / diff(F, y))
 
 
