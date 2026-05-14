@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-14T13:19:51.536261+00:00",
+  "generated": "2026-05-14T15:12:23.820125+00:00",
   "problems": [
     {
       "id": "calc_deriv_poly_001",
@@ -48,6 +48,48 @@
       ],
       "topic": "Implicit Differentiation",
       "description": "Implicit differentiation of a complex mixed-exponent curve",
+      "difficulty": "hard",
+      "course": "Calculus"
+    },
+    {
+      "id": "calc_deriv_drill_001",
+      "tags": [
+        "calculus",
+        "derivatives",
+        "logarithmic",
+        "chain-rule",
+        "inverse-trig"
+      ],
+      "topic": "Derivatives",
+      "description": "Five-part differentiation drill: log rules, log base-b, arcsin, chain rule, quotient with arccos",
+      "difficulty": "medium",
+      "course": "Calculus"
+    },
+    {
+      "id": "calc_implicit_drill_001",
+      "tags": [
+        "calculus",
+        "implicit-differentiation",
+        "logarithmic",
+        "trig"
+      ],
+      "topic": "Implicit Differentiation",
+      "description": "Four-part implicit differentiation drill: polynomial, folium, log, trig",
+      "difficulty": "medium",
+      "course": "Calculus"
+    },
+    {
+      "id": "calc_curve_analysis_001",
+      "tags": [
+        "calculus",
+        "derivatives",
+        "critical-points",
+        "concavity",
+        "monotone-intervals",
+        "inflection-points"
+      ],
+      "topic": "Curve Analysis",
+      "description": "Find increasing/decreasing intervals, concavity, and classify critical points for a degree-4 polynomial",
       "difficulty": "hard",
       "course": "Calculus"
     }
