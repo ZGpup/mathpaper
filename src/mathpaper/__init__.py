@@ -11,6 +11,7 @@ from mathpaper.content.math import Math
 from mathpaper.content.raw import RawTypst
 from mathpaper.figures.base import Figure
 from mathpaper.render.typst import TypstRenderer
+from mathpaper.library import ProblemLibrary, ProblemDef, problem
 
 __all__ = [
     "Test",
@@ -25,4 +26,7 @@ __all__ = [
     "RawTypst",
     "Figure",
     "TypstRenderer",
+    "ProblemLibrary",
+    "ProblemDef",
+    "problem",
 ]

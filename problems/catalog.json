@@ -1,0 +1,55 @@
+{
+  "generated": "2026-05-14T13:19:51.536261+00:00",
+  "problems": [
+    {
+      "id": "calc_deriv_poly_001",
+      "tags": [
+        "calculus",
+        "derivatives",
+        "polynomial"
+      ],
+      "topic": "Derivatives",
+      "description": "Find f'(x) for a degree-4 polynomial",
+      "difficulty": "easy",
+      "course": "Calculus"
+    },
+    {
+      "id": "calc_deriv_poly_multipart_001",
+      "tags": [
+        "calculus",
+        "derivatives",
+        "second-derivative",
+        "critical-points",
+        "polynomial"
+      ],
+      "topic": "Derivatives",
+      "description": "Find f'(x), f''(x), and classify critical points for a degree-4 polynomial",
+      "difficulty": "medium",
+      "course": "Calculus"
+    },
+    {
+      "id": "calc_implicit_circle_001",
+      "tags": [
+        "calculus",
+        "implicit-differentiation",
+        "circle"
+      ],
+      "topic": "Implicit Differentiation",
+      "description": "Implicit differentiation of a circle x\u00b2 + y\u00b2 = r\u00b2",
+      "difficulty": "medium",
+      "course": "Calculus"
+    },
+    {
+      "id": "calc_implicit_mixed_001",
+      "tags": [
+        "calculus",
+        "implicit-differentiation",
+        "exponential"
+      ],
+      "topic": "Implicit Differentiation",
+      "description": "Implicit differentiation of a complex mixed-exponent curve",
+      "difficulty": "hard",
+      "course": "Calculus"
+    }
+  ]
+}

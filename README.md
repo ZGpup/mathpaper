@@ -1,117 +1,138 @@
 # mathpaper
 
-Python-first math document generation. Define problems and their answers in Python, get a student worksheet and a correct answer key — both as PDFs.
+A math problem library and test builder for educators. Search a growing bank of tagged, curriculum-aligned problems, preview them rendered, and assemble a print-ready PDF quiz — without writing code. When you need a new problem type, write one Python function and it joins the library permanently.
+
+---
+
+## Setup
+
+**Requirements:** [Typst](https://typst.app/) installed and on your PATH.
+
+```bash
+git clone https://github.com/your-username/mathpaper
+cd mathpaper
+conda env create -f environment.yml   # creates the mathpaper-dev environment
+conda activate mathpaper-dev
+```
+
+For the browser test builder, also install the explore extras:
+
+```bash
+pip install ".[explore]"
+```
+
+Verify everything is working:
+
+```bash
+mathpaper check-typst
+mathpaper index ./problems
+```
+
+---
+
+## Browser test builder
+
+The fastest way to build a quiz. No code required.
+
+```bash
+conda activate mathpaper-dev
+mathpaper explore ./problems
+```
+
+This opens a local browser UI where you can:
+
+- Search problems by topic, tag, course, difficulty, or keyword
+- Preview any problem as a rendered PDF
+- Select problems and arrange them into a test
+- Set the title, course, and version
+- Click **Build PDF** to produce student and answer-key PDFs in one step
+- Click **Export .py** to get a Python script you can customize further
+
+> Requires the `explore` extras (`pip install ".[explore]"`)
+
+---
+
+## Problem library
+
+Problems are stored as tagged Python functions in the `problems/` directory. The library loads them at startup — no database to maintain, no migration scripts, just Python files you can version-control and share.
+
+### Search from the command line
+
+```bash
+mathpaper search --tag derivatives
+mathpaper search --topic "Implicit Differentiation" --difficulty hard
+mathpaper search --course Calculus --keywords "critical points"
+```
+
+### Use from a script
 
 ```python
-from mathpaper import Test, Problem, MultipartProblem, Part, Text, Math, PartsGrid
-from sympy import symbols, expand, factor
+from mathpaper import Test
+from mathpaper.library import ProblemLibrary
 
-x = symbols("x")
-roots = [-3, 1, 4]
-poly  = expand((x - roots[0]) * (x - roots[1]) * (x - roots[2]))
+lib = ProblemLibrary("./problems")
 
-quiz = Test(title="Polynomial Quiz", course="Algebra 2", version="A")
-
-quiz.add(Problem(
-    prompt=Text(f"Factor completely: $x^2 - 3x - 10$"),
-    answer=Math(str(factor(poly))),
-    answer_space="1.2in",
-    points=4,
-))
+quiz = Test(title="Derivatives Quiz", course="Calculus", version="A")
+for p in lib.search(tags=["derivatives"]):
+    quiz.add(p.build())
 
 quiz.build("out/quiz")
 # out/quiz/main.pdf        ← student version
 # out/quiz/answer_key.pdf  ← answer key (computed, not hand-written)
 ```
 
-## Requirements
-
-- Python 3.11+
-- [Typst](https://typst.app/) on your PATH (for PDF compilation)
-
-## Installation
-
-**From source (development):**
-
-```bash
-git clone https://github.com/your-username/mathpaper
-cd mathpaper
-pip install -e ".[dev]"
-```
-
-Verify Typst is found:
-
-```bash
-mathpaper check-typst
-```
-
-## Quick start
-
-### Simple worksheet
+Swap a problem's values without editing the library:
 
 ```python
-from mathpaper import Test, Problem, Text, Math
+from sympy import symbols
+x = symbols("x")
 
-quiz = Test(title="Linear Equations", course="Algebra 1")
-
-quiz.add(Problem(
-    prompt=Text("Solve for x:  2x + 5 = 13"),
-    answer=Math("x = 4"),
-    answer_space="1in",
-    points=3,
-))
-
-quiz.build("out/my_quiz")
+lib.get("calc_deriv_poly_001").build(expr=x**3 - 3*x)
 ```
 
-### Multi-part problem with auto-computed answers
+Track what you've used in past quizzes:
+
+```bash
+mathpaper history --course Calculus
+```
+
+---
+
+## Writing a new problem
+
+Add a `@problem`-decorated function to any `.py` file under `problems/`. Run `mathpaper index ./problems` afterward and it appears in search immediately.
 
 ```python
-from mathpaper import Test, MultipartProblem, Part, Text, Math, PartsGrid
-from sympy import symbols, expand, factor
+# problems/calculus/derivatives.py
+from mathpaper import Problem, Text, Math
+from mathpaper.library import problem
+from mathpaper.math.calculus import derivative
+from mathpaper.math import sympy_to_typst
+from sympy import symbols
 
 x = symbols("x")
 
-# Define roots once — answers fall out automatically
-roots   = [-2, 5]
-poly    = expand((x - roots[0]) * (x - roots[1]))
-factored = factor(poly)
-y_int   = int(poly.subs(x, 0))
-
-quiz = Test(title="Quadratic Functions", course="Algebra 2")
-quiz.add(MultipartProblem(
-    prompt=Text(f"Let $f(x) = {poly}$."),
-    parts=[
-        Part("Find all real zeros.", answer=Math(", ".join(str(r) for r in sorted(roots)))),
-        Part("Find the y-intercept.", answer=Math(f"(0, {y_int})")),
-        Part("Write f in factored form.", answer=Math(str(factored))),
-        Part("Describe the end behavior."),
-    ],
-    layout=PartsGrid(columns=2, answer_space="1.2in"),
-    points=8,
-))
-
-quiz.build("out/quadratic_quiz")
+@problem(
+    id="calc_deriv_poly_001",
+    tags=["calculus", "derivatives", "polynomial"],
+    topic="Derivatives",
+    description="Find f'(x) for a degree-4 polynomial",
+    difficulty="easy",
+    course="Calculus",
+)
+def calc_deriv_poly_001(expr=None):
+    e = expr or x**4 - 8*x**2 + 7
+    return Problem(
+        prompt=Text(f"Let $f(x) = {sympy_to_typst(e)}$. Find $f'(x)$."),
+        answer=Math(f"f'(x) = {sympy_to_typst(derivative(e))}"),
+        answer_space="1.2in",
+        points=4,
+    )
 ```
 
-### Output structure
+The answer is computed from the expression — change `expr` and both the student worksheet and the answer key update automatically.
 
-```
-out/quadratic_quiz/
-  main.typ         ← Typst source, student version
-  main.pdf
-  answer_key.typ   ← Typst source, solution version
-  answer_key.pdf
-  assets/          ← figures copied here on build
-  manifest.json    ← metadata
-```
-
-## Why Python → Typst?
-
-- **Computed answers**: use SymPy, NumPy, or any math library to generate answers. The answer key is correct by construction.
-- **Variants**: change roots or coefficients at the top of a script and regenerate 30 quiz versions without re-checking a single answer.
-- **Figures**: pipe Matplotlib or custom SVG output directly into problems as assets (Phase 3).
-- **Inspectable output**: generated `.typ` files are readable and debuggable. You are never locked into the Python layer.
+---
 
 ## Public API
 
@@ -133,30 +154,39 @@ Math(r"x^2 - 4")          # Typst math syntax
 RawTypst("#v(0.5in)")      # raw Typst escape hatch
 Figure("path/to/file.svg")
 
+# Problem library
+ProblemLibrary("./problems")
+@problem(id, tags, topic, description, difficulty, course)
+lib.search(tags, topic, course, difficulty, keywords)
+lib.get("problem_id").build(**kwargs)
+lib.build_catalog("catalog.json")
+
 # Renderer (advanced)
-TypstRenderer()
-quiz.to_typst(mode="student")    # returns Typst string
-quiz.write_typst(out_dir, mode)  # writes .typ file, returns Path
-quiz.build(out_dir)              # full build: .typ + .pdf + assets + manifest
+quiz.to_typst(mode="student")
+quiz.write_typst(out_dir, mode)
+quiz.build(out_dir)
 ```
+
+---
 
 ## Examples
 
 | Example | File |
 |---|---|
-| Algebra 1 linear equations worksheet | [examples/algebra_1/build.py](examples/algebra_1/build.py) |
-| Algebra 2 polynomial analysis quiz | [examples/algebra_2/polynomial_quiz.py](examples/algebra_2/polynomial_quiz.py) |
-
-Run any example from the project root:
+| Calculus derivatives quiz | [examples/calculus/derivatives_quiz.py](examples/calculus/derivatives_quiz.py) |
+| Algebra 2 polynomial quiz | [examples/algebra_2/polynomial_quiz.py](examples/algebra_2/polynomial_quiz.py) |
+| Calculus problem library | [problems/calculus/derivatives.py](problems/calculus/derivatives.py) |
 
 ```bash
-python examples/algebra_2/polynomial_quiz.py
+python examples/calculus/derivatives_quiz.py
 ```
+
+---
 
 ## Development
 
 ```bash
-pip install -e ".[dev]"
+conda activate mathpaper-dev
 pytest
 ruff check src/
 ```

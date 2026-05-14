@@ -36,6 +36,10 @@ plotly = [
   "plotly",
   "kaleido",
 ]
+explore = [
+  "streamlit>=1.30",
+  "pymupdf>=1.23",
+]
 
 [project.scripts]
 mathpaper = "mathpaper.cli:main"
