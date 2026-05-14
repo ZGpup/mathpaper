@@ -1,4 +1,12 @@
 """Math module for mathpaper."""
+from mathpaper.math.calculus import (
+    critical_points,
+    derivative,
+    implicit_derivative,
+    nth_derivative,
+    second_derivative,
+    tangent_line_at,
+)
 from mathpaper.math.expressions import sympy_to_typst
 from mathpaper.math.polynomials import (
     degree_of,
@@ -15,6 +23,14 @@ from mathpaper.math.polynomials import (
 
 __all__ = [
     "sympy_to_typst",
+    # calculus
+    "derivative",
+    "second_derivative",
+    "nth_derivative",
+    "implicit_derivative",
+    "critical_points",
+    "tangent_line_at",
+    # polynomials
     "polynomial_from_roots",
     "polynomial_from_roots_with_multiplicity",
     "leading_coefficient",

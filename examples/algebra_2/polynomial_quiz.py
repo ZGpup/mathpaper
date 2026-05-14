@@ -142,6 +142,3 @@ quiz.add(p3)
 
 quiz.build("out/algebra_2")
 print("Built to out/algebra_2/")
-print(f"  P1  {sympy_to_typst(q1_poly)} = {sympy_to_typst(q1_factored)}")
-print(f"  P2  zeros={q2_zeros}, y-int={q2_yint}, f<0 on {q2_neg}")
-print(f"  P3  zeros={c_zeros}, y-int={c_yint}, f>0 on {c_pos}, tp≤{c_tp}")

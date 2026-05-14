@@ -465,6 +465,17 @@ The renderer should escape user text properly. Raw Typst should only be inserted
 
 The output directory should contain all assets needed by Typst. Avoid referencing files outside the Typst project root unless the user explicitly configures this.
 
+## Development environment
+
+All Python work must be done inside the `mathpaper-dev` conda environment:
+
+```bash
+conda activate mathpaper-dev
+python3 ...
+```
+
+The package is installed in editable mode there (`pip install -e .`), so imports like `from mathpaper import ...` resolve correctly. Running Python outside this environment will fail with import errors.
+
 ## Dependencies
 
 Core package dependencies should stay modest.

@@ -22,11 +22,7 @@ def sympy_to_typst(expr) -> str:
     s = s.replace(r"\left(", "(").replace(r"\right)", ")")
     s = s.replace(r"\left|", "|").replace(r"\right|", "|")
 
-    # Fractions: \frac{a}{b} → (a)/(b)
-    # Must run before exponent/subscript fixups that also match braces.
-    s = re.sub(r'\\frac\{([^{}]+)\}\{([^{}]+)\}', r'(\1)/(\2)', s)
-
-    # Roots: \sqrt{x} → sqrt(x)
+    # Roots: \sqrt{x} → sqrt(x)  (before exponents so sqrt{x^{2}} still works)
     s = re.sub(r'\\sqrt\{([^{}]+)\}', r'sqrt(\1)', s)
 
     # Exponents: x^{2} → x^2, x^{10} → x^(10)
@@ -36,6 +32,11 @@ def sympy_to_typst(expr) -> str:
     # Subscripts: x_{i} → x_i, x_{ij} → x_(ij)
     s = re.sub(r'_\{(\w)\}', r'_\1', s)
     s = re.sub(r'_\{([^}]+)\}', r'_(\1)', s)
+
+    # Fractions: \frac{a}{b} → (a)/(b)
+    # Runs after exponent/subscript fixups so denominators like x + 3 y^{2}
+    # have already had their inner braces removed and are matchable.
+    s = re.sub(r'\\frac\{([^{}]+)\}\{([^{}]+)\}', r'(\1)/(\2)', s)
 
     # Greek letters: \alpha → alpha (strip backslash)
     _greek = (
