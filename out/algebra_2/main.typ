@@ -11,7 +11,7 @@ Name: #box(width: 3in, line(length: 100%, stroke: 0.5pt))
 
 
 #block(breakable: false)[
-*1. (4 pts)* Factor completely: $2 x^2 - 2 x - 12$
+*1. (4 pts)* Factor completely: $2 x^2 - 2 x - 12$  
 
 #v(1.2in)
 ]

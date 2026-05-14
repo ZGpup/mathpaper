@@ -1,3 +1,5 @@
+import re
+
 _TYPST_SPECIAL = str.maketrans({
     "\\": "\\\\",
     "#":  "\\#",
@@ -12,6 +14,14 @@ _TYPST_SPECIAL = str.maketrans({
     "]":  "\\]",
 })
 
+# Matches inline math regions $...$ so their contents are not escaped.
+_MATH_RE = re.compile(r'(\$[^$]+\$)')
+
 
 def escape_typst_text(text: str) -> str:
-    return text.translate(_TYPST_SPECIAL)
+    """Escape Typst special characters, leaving $...$ math regions untouched."""
+    parts = _MATH_RE.split(text)
+    return "".join(
+        part if part.startswith("$") else part.translate(_TYPST_SPECIAL)
+        for part in parts
+    )

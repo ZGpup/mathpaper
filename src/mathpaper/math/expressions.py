@@ -54,6 +54,66 @@ def _convert_fracs(s: str) -> str:
     return ''.join(result)
 
 
+def _strip_func_braces(s: str, func_re) -> str:
+    """Strip outer braces from \\funcname{arg} patterns using balanced brace matching.
+
+    Handles subscripts like \\log_{5}{arg} and recursively processes nested
+    function calls so inner \\sin{(x)} inside a \\log{...} are also stripped.
+    """
+    result = []
+    i = 0
+    while i < len(s):
+        m = func_re.search(s, i)
+        if not m:
+            result.append(s[i:])
+            break
+        result.append(s[i:m.start()])
+        func_name = m.group(1)
+        subscript = m.group(2)
+        depth = 1
+        j = m.end()
+        while j < len(s) and depth > 0:
+            if s[j] == '{':
+                depth += 1
+            elif s[j] == '}':
+                depth -= 1
+            j += 1
+        inner = s[m.end():j - 1]
+        inner = _strip_func_braces(inner, func_re)
+        result.append(f'{func_name}{subscript}{inner}')
+        i = j
+    return ''.join(result)
+
+
+def _handle_log_base(expr) -> str | None:
+    """If expr is log(X)/log(b), return the Typst 'log_b(X)' string, else None.
+
+    SymPy stores log(X, b) as log(X)/log(b) internally. This detects that
+    pattern and renders it in Typst subscript notation instead of a fraction.
+    """
+    from sympy import Mul, Pow, log as _log
+    if not isinstance(expr, Mul):
+        return None
+    log_numer = None
+    log_denom = None
+    for arg in expr.args:
+        if isinstance(arg, _log) and len(arg.args) == 1:
+            log_numer = arg.args[0]
+        elif (isinstance(arg, Pow) and
+              isinstance(arg.args[0], _log) and
+              len(arg.args[0].args) == 1 and
+              arg.args[1] == -1):
+            log_denom = arg.args[0].args[0]
+        else:
+            return None
+    if log_numer is None or log_denom is None:
+        return None
+    base_str = sympy_to_typst(log_denom)
+    inner_str = sympy_to_typst(log_numer)
+    sub = f'_({base_str})' if len(base_str) > 1 else f'_{base_str}'
+    return f'log{sub}({inner_str})'
+
+
 def sympy_to_typst(expr) -> str:
     """Convert a SymPy expression to a Typst math string.
 
@@ -61,6 +121,10 @@ def sympy_to_typst(expr) -> str:
     Covers polynomials, fractions, roots, logs, trig, and Greek letters.
     Extend the fixup list as new expression types are needed.
     """
+    result = _handle_log_base(expr)
+    if result is not None:
+        return result
+
     s = latex(expr)
 
     # Sizing delimiters — Typst doesn't use \left/\right.
@@ -79,16 +143,17 @@ def sympy_to_typst(expr) -> str:
     ]:
         s = s.replace(f'\\operatorname{{{_op}}}', f'\\{_arc}')
 
-    # Math functions: strip \cmd{...} braces added by SymPy around the arg
-    # parens, e.g. \sin{(x)} → sin(x).  Must run before _convert_fracs so
-    # these braces don't confuse brace matching inside fractions.
+    # Math functions: strip \cmd{...} braces using balanced brace matching so
+    # that complex nested arguments (fractions, exponents) are handled correctly.
+    # Must run before _convert_fracs so these braces don't confuse frac parsing.
     _funcs = (
         "log|ln|exp|"
         "sin|cos|tan|cot|sec|csc|"
         "arcsin|arccos|arctan|arccot|arcsec|arccsc|"
         "sinh|cosh|tanh|coth"
     )
-    s = re.sub(rf'\\({_funcs})\{{([^{{}}]*)\}}', r'\1\2', s)
+    _func_re = re.compile(rf'\\({_funcs})((?:_\{{[^}}]*\}}|_\w)*)\{{')
+    s = _strip_func_braces(s, _func_re)
     # Also handle bare \cmd without braces (e.g. \log x)
     s = re.sub(rf'\\({_funcs})\b', r'\1', s)
 
