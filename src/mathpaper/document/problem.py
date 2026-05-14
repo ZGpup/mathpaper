@@ -9,6 +9,7 @@ class Problem:
     answer: Any | None = None
     answer_space: str | None = None
     points: int | None = None
+    keep_together: bool = True
 
 
 @dataclass
@@ -19,3 +20,4 @@ class MultipartProblem:
     figure_layout: Any | None = None
     layout: Any | None = None
     points: int | None = None
+    keep_together: bool = True

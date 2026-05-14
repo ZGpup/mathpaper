@@ -60,10 +60,15 @@ class TypstRenderer:
         from mathpaper.document.problem import Problem, MultipartProblem
 
         if isinstance(block, Problem):
-            return self._render_problem(block, number, mode)
-        if isinstance(block, MultipartProblem):
-            return self._render_multipart(block, number, mode)
-        return f"// unknown block type: {type(block).__name__}\n"
+            inner = self._render_problem(block, number, mode)
+        elif isinstance(block, MultipartProblem):
+            inner = self._render_multipart(block, number, mode)
+        else:
+            return f"// unknown block type: {type(block).__name__}\n"
+
+        if getattr(block, "keep_together", False):
+            return f"#block(breakable: false)[\n{inner.rstrip()}\n]\n"
+        return inner
 
     def _render_problem(self, problem: Any, number: int, mode: str) -> str:
         lines: list[str] = []
