@@ -1,0 +1,20 @@
+{
+  "title": "Polynomial Functions Quiz",
+  "course": "Algebra 2",
+  "version": "A",
+  "created_by": "mathpaper 0.1.0",
+  "problems": [
+    {
+      "index": 1,
+      "type": "Problem"
+    },
+    {
+      "index": 2,
+      "type": "Problem"
+    },
+    {
+      "index": 3,
+      "type": "MultipartProblem"
+    }
+  ]
+}

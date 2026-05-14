@@ -1,1 +1,3 @@
-"""Figures module for mathpaper."""
+from mathpaper.figures.base import Figure
+
+__all__ = ["Figure"]

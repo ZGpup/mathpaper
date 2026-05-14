@@ -1,0 +1,44 @@
+#set page(paper: "us-letter", margin: (top: 1in, bottom: 1in, left: 1in, right: 1in))
+#set text(font: "New Computer Modern", size: 11pt)
+#set par(leading: 0.6em)
+#show math.equation: set text(size: 11pt)
+
+#grid(columns: (1fr, 1fr), align: (left, right))[*Polynomial Functions Quiz*][Algebra 2  Version A]
+Name: #box(width: 3in, line(length: 100%, stroke: 0.5pt))
+
+#line(length: 100%, stroke: 0.5pt)
+#v(0.3em)
+
+
+*1. (4 pts)* Factor completely: $x^2 - 3 x + 2$
+
+#v(1.2in)
+
+*2. (3 pts)* Find all real zeros of $f(x) = x^2 - 3 x + 2$.
+
+#v(1in)
+
+*3. (8 pts)* Let $f(x) = x^3 - 2 x^2 - 11 x + 12$. Use algebra to answer the following.
+
+#grid(columns: (1fr, 1fr), column-gutter: 1em, row-gutter: 1em,
+[
+*a.* Find all real zeros of $f$.
+
+#v(1.2in)
+],
+[
+*b.* Find the $y$-intercept.
+
+#v(1.2in)
+],
+[
+*c.* Describe the end behavior of $f$.
+
+#v(1.2in)
+],
+[
+*d.* State the interval(s) where $f(x) \> 0$.
+
+#v(1.2in)
+]
+)
