@@ -1,0 +1,42 @@
+name: mathpaper-dev
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+
+  # Core scientific/math stack
+  - numpy
+  - scipy
+  - sympy
+  - matplotlib
+  - pillow
+
+  # Packaging and development
+  - pytest
+  - pytest-cov
+  - ruff
+  - mypy
+  - build
+  - twine
+  - hatchling
+  - pre-commit
+
+  # Useful for examples/docs
+  - jupyterlab
+  - ipykernel
+
+  # Optional figure/export support
+  - plotly
+  - python-kaleido
+
+  # Template rendering / utilities
+  - jinja2
+  - platformdirs
+  - pydantic
+  - rich
+  - typer
+
+  # Install package in editable mode after env creation
+  - pip:
+      - -e .

@@ -1,37 +1,53 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=70", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "mathpaper"
 version = "0.1.0"
-description = "A Python library for generating mathematical worksheets and problem sets"
+description = "Python-first math worksheet and test generation with Typst."
 readme = "README.md"
-license = {text = "MIT"}
+requires-python = ">=3.11"
+license = { text = "MIT" }
 authors = [
-    {name = "Author Name", email = "author@example.com"}
+  { name = "Zephyr Gilmore" }
 ]
-requires-python = ">=3.9"
+
 dependencies = [
-    
+  "sympy>=1.12",
+  "numpy>=1.26",
+  "matplotlib>=3.8",
+  "jinja2>=3.1",
+  "platformdirs>=4.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "pytest-cov>=4.0",
-    "black>=22.0",
-    "isort>=5.0",
-    "flake8>=4.0",
-    "mypy>=0.9",
+  "pytest",
+  "ruff",
+  "mypy",
+  "build",
+  "twine",
 ]
-docs = [
-    "sphinx>=4.0",
-    "sphinx-rtd-theme>=1.0",
+manim = [
+  "manim",
 ]
+plotly = [
+  "plotly",
+  "kaleido",
+]
+
+[project.scripts]
+mathpaper = "mathpaper.cli:main"
 
 [tool.setuptools]
-packages = ["mathpaper"]
+include-package-data = true
 
-[tool.setuptools.package-dir]
-"" = "src"
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mathpaper = [
+  "templates/typst/**/*.typ",
+  "resources/**/*",
+]

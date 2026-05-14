@@ -15,7 +15,6 @@ See [examples](examples/) for usage examples.
 
 See [docs](docs/) for detailed documentation.
 
-## License
+## Licenses
 
-MIT
->>>>>>> 83de596 (Initial project structure)
+
