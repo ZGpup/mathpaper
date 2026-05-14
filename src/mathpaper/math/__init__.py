@@ -1,8 +1,13 @@
 """Math module for mathpaper."""
 from mathpaper.math.calculus import (
+    classify_critical_points,
+    concavity_intervals,
     critical_points,
     derivative,
     implicit_derivative,
+    implicit_tangent_at,
+    inflection_points,
+    monotone_intervals,
     nth_derivative,
     second_derivative,
     tangent_line_at,
@@ -28,8 +33,13 @@ __all__ = [
     "second_derivative",
     "nth_derivative",
     "implicit_derivative",
+    "implicit_tangent_at",
     "critical_points",
     "tangent_line_at",
+    "inflection_points",
+    "concavity_intervals",
+    "classify_critical_points",
+    "monotone_intervals",
     # polynomials
     "polynomial_from_roots",
     "polynomial_from_roots_with_multiplicity",

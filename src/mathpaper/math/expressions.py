@@ -72,19 +72,15 @@ def sympy_to_typst(expr) -> str:
     s = re.sub(r'\\left\s*\|', '|', s)
     s = re.sub(r'\\right\s*\|', '|', s)
 
-    # Roots: \sqrt{x} → sqrt(x)  (before exponents so sqrt{x^{2}} still works)
-    s = re.sub(r'\\sqrt\{([^{}]+)\}', r'sqrt(\1)', s)
-
-    # Exponents: x^{2} → x^2, x^{10} → x^(10)
-    s = re.sub(r'\^\{(\w)\}', r'^\1', s)
-    s = re.sub(r'\^\{([^}]+)\}', r'^(\1)', s)
-
-    # Subscripts: x_{i} → x_i, x_{ij} → x_(ij)
-    s = re.sub(r'_\{(\w)\}', r'_\1', s)
-    s = re.sub(r'_\{([^}]+)\}', r'_(\1)', s)
+    # SymPy may use \operatorname{asin} etc. instead of \arcsin.
+    for _op, _arc in [
+        ('asin', 'arcsin'), ('acos', 'arccos'), ('atan', 'arctan'),
+        ('acot', 'arccot'), ('asec', 'arcsec'), ('acsc', 'arccsc'),
+    ]:
+        s = s.replace(f'\\operatorname{{{_op}}}', f'\\{_arc}')
 
     # Math functions: strip \cmd{...} braces added by SymPy around the arg
-    # parens, e.g. \log{(x)} → log(x).  Must run before _convert_fracs so
+    # parens, e.g. \sin{(x)} → sin(x).  Must run before _convert_fracs so
     # these braces don't confuse brace matching inside fractions.
     _funcs = (
         "log|ln|exp|"
@@ -99,8 +95,25 @@ def sympy_to_typst(expr) -> str:
     # Multiplication dot: \cdot → space (juxtaposition is multiplication in Typst)
     s = s.replace(r'\cdot', ' ')
 
-    # Fractions: \frac{A}{B} → (A)/(B), handles nested braces
+    # Fractions: \frac{A}{B} → (A)/(B), handles nested braces.
+    # Must run before exponents so ^{\frac{3}{2}} → ^{(3)/(2)} → ^((3)/(2)).
     s = _convert_fracs(s)
+
+    # Exponents: ^{2} → ^2, ^{10} → ^(10).
+    # Must run before sqrt so \sqrt{1 - x^{2}} → \sqrt{1 - x^2} → sqrt(1 - x^2).
+    s = re.sub(r'\^\{(\w)\}', r'^\1', s)
+    s = re.sub(r'\^\{([^}]+)\}', r'^(\1)', s)
+
+    # Subscripts: x_{i} → x_i, x_{ij} → x_(ij)
+    s = re.sub(r'_\{(\w)\}', r'_\1', s)
+    s = re.sub(r'_\{([^}]+)\}', r'_(\1)', s)
+
+    # Roots: now that nested ^{} are resolved, content is brace-free.
+    s = re.sub(r'\\sqrt\{([^{}]+)\}', r'sqrt(\1)', s)
+
+    # Trig powers: \arccos^{2}{\left(x\right)} → after prior steps becomes
+    # arccos^2{(x)}. Strip the leftover {(...)} grouping.
+    s = re.sub(r'(\w+)(\^[\w(][^{]*)\{(\([^){}]*\))\}', r'\1\2\3', s)
 
     # Greek letters: \alpha → alpha (strip backslash)
     _greek = (
