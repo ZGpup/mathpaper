@@ -1,18 +1,27 @@
 #!/usr/bin/env bash
-# Run the full pytest suite — but only when committing to main.
-# Installed as a pre-commit hook via .pre-commit-config.yaml.
+# Pre-push gate: run pytest only when one of the refs being pushed is main.
+# Installed via .pre-commit-config.yaml (stage: pre-push).
+#
+# Git's pre-push hook protocol: stdin contains one line per ref being pushed,
+# in the form  "<local_ref> <local_sha> <remote_ref> <remote_sha>".
+# The pre-commit framework forwards that stdin to this script unchanged.
 set -e
 
-branch="$(git symbolic-ref --short HEAD 2>/dev/null || echo '')"
-if [ "$branch" != "main" ]; then
-  echo "[pytest-on-main] on branch '$branch' — skipping tests."
+pushing_main=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    pushing_main=1
+    break
+  fi
+done
+
+if [ "$pushing_main" -eq 0 ]; then
+  echo "[pytest-on-push-to-main] not pushing to main — skipping tests."
   exit 0
 fi
 
-echo "[pytest-on-main] on main — running pytest..."
+echo "[pytest-on-push-to-main] pushing to main — running pytest..."
 
-# Prefer the project conda env if it exists; otherwise rely on whatever
-# python is on PATH (the developer's active env).
 if command -v conda >/dev/null 2>&1 && conda env list 2>/dev/null | grep -q '^mathpaper-dev '; then
   conda run --no-capture-output -n mathpaper-dev pytest -q tests/
 else

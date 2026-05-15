@@ -1,10 +1,10 @@
 repos:
   - repo: local
     hooks:
-      - id: pytest-on-main
-        name: Run pytest before committing to main
+      - id: pytest-on-push-to-main
+        name: Run pytest before pushing to main
         entry: scripts/run_tests_on_main.sh
         language: script
         pass_filenames: false
         always_run: true
-        stages: [pre-commit]
+        stages: [pre-push]

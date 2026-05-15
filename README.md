@@ -33,8 +33,8 @@ brew install typst              # macOS
 # or: cargo install typst-cli   # any platform with rust
 # or download a binary from https://github.com/typst/typst/releases
 
-# 4. (optional) install pre-commit so tests run before commits to main
-pre-commit install
+# 4. (optional) install the test gate so pytest runs before pushes to main
+pre-commit install --hook-type pre-push
 ```
 
 ### Verify everything works
@@ -293,14 +293,16 @@ mathpaper build my_quiz.py --no-render-figures
 
 ```bash
 conda activate mathpaper-dev
-pytest -q                       # run the test suite
-ruff check src/                 # lint
-pre-commit install              # install hook so tests run before commits to main
+pytest -q                                  # run the test suite
+ruff check src/                            # lint
+pre-commit install --hook-type pre-push    # install the pre-push test gate
 ```
 
-The `pre-commit` hook runs `pytest` automatically only when committing to
-`main`. On any other branch it skips, so you can commit work-in-progress
-freely.
+The hook runs `pytest` automatically — but only when a `git push` would
+update remote `main`. Pushes to feature branches skip it, so you can push
+work-in-progress freely. Local commits and merges are never blocked; the
+gate runs at push time, which catches fast-forward merges, merge commits,
+squash merges, and rebases uniformly.
 
 ---
 
@@ -316,7 +318,7 @@ freely.
 | Manim figure errors on first run | `manim` not installed | `pip install ".[manim]"` |
 | Build is slow on each run | re-rendering figures every time | add `--no-render-figures` once cached |
 | `ChunkType … appeared before IHDR` from Typst | corrupt PNG in `assets/` | delete `.mathpaper_cache/figures/` and rebuild |
-| Tests didn't run before commit | `pre-commit` not installed | `pre-commit install` (one-time) |
+| Tests didn't run before push to main | pre-push hook not installed | `pre-commit install --hook-type pre-push` (one-time) |
 
 ---
 
