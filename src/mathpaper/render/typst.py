@@ -15,6 +15,21 @@ def _content_to_typst(obj: Any, mode: str) -> str:
     return escape_typst_text(str(obj))
 
 
+_LABEL_SCHEMES: dict[str, list[str]] = {
+    "alpha": list("abcdefghijklmnopqrstuvwxyz"),
+    "roman": [
+        "i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x",
+        "xi", "xii", "xiii", "xiv", "xv", "xvi", "xvii", "xviii", "xix", "xx",
+    ],
+    "numeric": [str(i) for i in range(1, 27)],
+}
+
+
+def _generate_labels(scheme: str, count: int) -> list[str]:
+    pool = _LABEL_SCHEMES.get(scheme, _LABEL_SCHEMES["alpha"])
+    return [pool[i] if i < len(pool) else str(i + 1) for i in range(count)]
+
+
 class TypstRenderer:
     def render(self, test: "Test", mode: str = "student") -> str:
         lines: list[str] = []
@@ -43,7 +58,6 @@ class TypstRenderer:
             parts.append(escape_typst_text(test.course))
         if test.version:
             parts.append(f"Version {escape_typst_text(test.version)}")
-        header_text = " #h(1fr) ".join(parts)
         name_line = "#box(width: 3in, line(length: 100%, stroke: 0.5pt))"
         return (
             f"#grid(columns: (1fr, 1fr), align: (left, right))[{parts[0]}][{'  '.join(parts[1:])}]\n"
@@ -53,94 +67,101 @@ class TypstRenderer:
         )
 
     # ------------------------------------------------------------------
-    # Blocks
+    # Top-level block
     # ------------------------------------------------------------------
 
     def _render_block(self, block: Any, number: int, mode: str) -> str:
-        from mathpaper.document.problem import Problem, MultipartProblem
+        from mathpaper.document.problem import Block
+        from mathpaper.document.parts import FreeResponse, Parts
 
-        if isinstance(block, Problem):
-            inner = self._render_problem(block, number, mode)
-        elif isinstance(block, MultipartProblem):
-            inner = self._render_multipart(block, number, mode)
-        else:
+        if not isinstance(block, Block):
             return f"// unknown block type: {type(block).__name__}\n"
 
-        if getattr(block, "keep_together", False):
+        pts = f" ({block.points} pts)" if block.points else ""
+        stem = _content_to_typst(block.stem, mode)
+        lines: list[str] = [f"*{number}.{pts}* {stem}", ""]
+
+        if isinstance(block.body, Parts):
+            lines.append(self._render_parts_node(block.body, mode, block.figure, block.figure_layout))
+        elif isinstance(block.body, FreeResponse):
+            if mode == "solution" and block.answer is not None:
+                answer = _content_to_typst(block.answer, mode)
+                lines.append(f"#block(fill: luma(230), inset: 6pt, radius: 3pt)[*Answer:* {answer}]")
+            else:
+                lines.append(f"#v({block.body.height})")
+
+        lines.append("")
+        inner = "\n".join(lines)
+
+        if block.keep_together:
             return f"#block(breakable: false)[\n{inner.rstrip()}\n]\n"
         return inner
 
-    def _render_problem(self, problem: Any, number: int, mode: str) -> str:
-        lines: list[str] = []
-        pts = f" ({problem.points} pts)" if problem.points else ""
-        prompt = _content_to_typst(problem.prompt, mode)
-        lines.append(f"*{number}.{pts}* {prompt}")
-        lines.append("")
+    # ------------------------------------------------------------------
+    # Parts (recursive)
+    # ------------------------------------------------------------------
 
-        if mode == "solution" and problem.answer is not None:
-            answer = _content_to_typst(problem.answer, mode)
-            lines.append(f"#block(fill: luma(230), inset: 6pt, radius: 3pt)[*Answer:* {answer}]")
-        elif problem.answer_space:
-            lines.append(f"#v({problem.answer_space})")
+    def _render_parts_node(
+        self,
+        parts_node: Any,
+        mode: str,
+        figure: Any = None,
+        figure_layout: Any = None,
+    ) -> str:
+        from mathpaper.document.layout import PartsGrid, SideFigure
+        from mathpaper.document.parts import Parts
 
-        lines.append("")
-        return "\n".join(lines)
-
-    def _render_multipart(self, problem: Any, number: int, mode: str) -> str:
-        lines: list[str] = []
-        pts = f" ({problem.points} pts)" if problem.points else ""
-        prompt = _content_to_typst(problem.prompt, mode)
-        lines.append(f"*{number}.{pts}* {prompt}")
-        lines.append("")
-
-        if problem.figure is not None:
-            fig_typst = _content_to_typst(problem.figure, mode)
-            from mathpaper.document.layout import SideFigure
-
-            if isinstance(problem.figure_layout, SideFigure):
-                fl = problem.figure_layout
-                body_lines = self._render_parts(problem.parts, mode, problem.layout)
-                lines.append(
-                    f"#grid(columns: (1fr, {fl.width}), column-gutter: 1em)[\n"
-                    f"{body_lines}\n"
-                    f"][{fig_typst}]"
-                )
-            else:
-                lines.append(fig_typst)
-                lines.append("")
-                lines.append(self._render_parts(problem.parts, mode, problem.layout))
-        else:
-            lines.append(self._render_parts(problem.parts, mode, problem.layout))
-
-        lines.append("")
-        return "\n".join(lines)
-
-    def _render_parts(self, parts: list, mode: str, layout: Any) -> str:
-        from mathpaper.document.layout import PartsGrid
-
+        layout = parts_node.layout
         columns = layout.columns if isinstance(layout, PartsGrid) else 1
         default_space = layout.answer_space if isinstance(layout, PartsGrid) else "1in"
+        labels = _generate_labels(parts_node.labels, len(parts_node.parts))
 
-        labels = "abcdefghijklmnopqrstuvwxyz"
-        part_blocks: list[str] = []
-        for i, part in enumerate(parts):
-            label = labels[i] if i < len(labels) else str(i + 1)
-            prompt = _content_to_typst(part.prompt, mode)
-            space = part.answer_space or default_space
-
-            if mode == "solution" and part.answer is not None:
-                answer = _content_to_typst(part.answer, mode)
-                body = (
-                    f"*{label}.* {prompt}\n\n"
-                    f"#block(fill: luma(230), inset: 4pt, radius: 3pt)[{answer}]"
-                )
-            else:
-                body = f"*{label}.* {prompt}\n\n#v({space})"
-            part_blocks.append(body)
+        part_blocks = [
+            self._render_part(label, part, mode, default_space)
+            for label, part in zip(labels, parts_node.parts)
+        ]
 
         if columns == 1:
-            return "\n\n".join(part_blocks)
+            body = "\n\n".join(part_blocks)
+        else:
+            col_spec = ", ".join(["1fr"] * columns)
+            cells = ",\n".join(f"[\n{b}\n]" for b in part_blocks)
+            body = f"#grid(columns: ({col_spec}), column-gutter: 1em, row-gutter: 1em,\n{cells}\n)"
 
-        col_spec = ", ".join(["1fr"] * columns)
-        cells = ",\n".join(f"[\n{b}\n]" for b in part_blocks)
-        return f"#grid(columns: ({col_spec}), column-gutter: 1em, row-gutter: 1em,\n{cells}\n)"
+        if figure is not None:
+            fig_typst = _content_to_typst(figure, mode)
+            if isinstance(figure_layout, SideFigure):
+                fl = figure_layout
+                return (
+                    f"#grid(columns: (1fr, {fl.width}), column-gutter: 1em)[\n"
+                    f"{body}\n"
+                    f"][{fig_typst}]"
+                )
+            return f"{fig_typst}\n\n{body}"
+
+        return body
+
+    def _render_part(self, label: str, part: Any, mode: str, default_space: str) -> str:
+        from mathpaper.document.parts import FreeResponse, Parts
+
+        prompt = _content_to_typst(part.prompt, mode)
+
+        if isinstance(part.body, Parts):
+            # Nested parts — recurse; the sub-Parts carries its own labels and layout
+            sub = self._render_parts_node(part.body, mode)
+            if part.body.indent:
+                sub = f"#pad(left: 1.5em)[\n{sub}\n]"
+            return f"*{label}.* {prompt}\n\n{sub}"
+
+        # FreeResponse leaf
+        # part.answer_space takes priority; fall back to the grid's default
+        height = part.answer_space or (
+            part.body.height if isinstance(part.body, FreeResponse) else default_space
+        )
+        if mode == "solution" and part.answer is not None:
+            answer = _content_to_typst(part.answer, mode)
+            return (
+                f"*{label}.* {prompt}\n\n"
+                f"#block(fill: luma(230), inset: 4pt, radius: 3pt)[{answer}]"
+            )
+        return f"*{label}.* {prompt}\n\n#v({height})"

@@ -3,8 +3,8 @@
 __version__ = "0.1.0"
 
 from mathpaper.document.test import Test
-from mathpaper.document.problem import Problem, MultipartProblem
-from mathpaper.document.parts import Part
+from mathpaper.document.problem import Block, Problem, MultipartProblem
+from mathpaper.document.parts import FreeResponse, Parts, Part
 from mathpaper.document.layout import AnswerSpace, PartsGrid, SideFigure
 from mathpaper.content.text import Text
 from mathpaper.content.math import Math
@@ -15,8 +15,11 @@ from mathpaper.library import ProblemLibrary, ProblemDef, problem
 
 __all__ = [
     "Test",
+    "Block",
     "Problem",
     "MultipartProblem",
+    "FreeResponse",
+    "Parts",
     "Part",
     "AnswerSpace",
     "PartsGrid",

@@ -36,7 +36,7 @@ Name: #box(width: 3in, line(length: 100%, stroke: 0.5pt))
 #block(fill: luma(230), inset: 4pt, radius: 3pt)[$f(x) -> +oo " as " x -> plus.minus oo$]
 ],
 [
-*d.* State the interval(s) where $f(x) \< 0$.
+*d.* State the interval(s) where $f(x) < 0$.
 
 #block(fill: luma(230), inset: 4pt, radius: 3pt)[$(-4, 1)$]
 ]
@@ -63,7 +63,7 @@ Name: #box(width: 3in, line(length: 100%, stroke: 0.5pt))
 #block(fill: luma(230), inset: 4pt, radius: 3pt)[$f(x) -> -oo " as " x -> -oo, quad f(x) -> +oo " as " x -> +oo$]
 ],
 [
-*d.* State the interval(s) where $f(x) \> 0$.
+*d.* State the interval(s) where $f(x) > 0$.
 
 #block(fill: luma(230), inset: 4pt, radius: 3pt)[$(-1, 2) union (4, +oo)$]
 ],
@@ -73,4 +73,55 @@ Name: #box(width: 3in, line(length: 100%, stroke: 0.5pt))
 #block(fill: luma(230), inset: 4pt, radius: 3pt)[$2$]
 ]
 )
+]
+
+#block(breakable: false)[
+*4. (12 pts)* Let $f(x) = 8 - 2 (x - 3)^2$, written in vertex form $a(x-h)^2 + k$.
+
+*a.* Describe the three transformations applied to $y = x^2$ to produce $f$.
+
+#pad(left: 1.5em)[
+*i.* Horizontal shift: right $3$ units.
+
+#block(fill: luma(230), inset: 4pt, radius: 3pt)[Replace $x$ with $x - 3$; shifts the graph right $3$.]
+
+*ii.* Vertical stretch/reflection by a factor of $2$ with a reflection over the $x$-axis.
+
+#block(fill: luma(230), inset: 4pt, radius: 3pt)[Multiply output by $-2$; stretches by $2$ and flips.]
+
+*iii.* Vertical shift up $8$ units.
+
+#block(fill: luma(230), inset: 4pt, radius: 3pt)[Add $8$ to the output; shifts the graph up $8$.]
+]
+
+*b.* Find the key features of $f$. Note how sub-parts i–iv are arranged in a two-column grid.
+
+#pad(left: 1.5em)[
+#grid(columns: (1fr, 1fr), column-gutter: 1em, row-gutter: 1em,
+[
+*i.* State the vertex.
+
+#block(fill: luma(230), inset: 4pt, radius: 3pt)[$(3, 8)$]
+],
+[
+*ii.* State the axis of symmetry.
+
+#block(fill: luma(230), inset: 4pt, radius: 3pt)[$x = 3$]
+],
+[
+*iii.* Find the $x$-intercepts algebraically.
+
+#block(fill: luma(230), inset: 4pt, radius: 3pt)[$x = 1, 5$]
+],
+[
+*iv.* Find the $y$-intercept.
+
+#block(fill: luma(230), inset: 4pt, radius: 3pt)[$(0, -10)$]
+]
+)
+]
+
+*c.* State the range of $f$ using interval notation.
+
+#block(fill: luma(230), inset: 4pt, radius: 3pt)[$(-infinity, 8]$]
 ]

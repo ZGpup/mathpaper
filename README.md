@@ -90,12 +90,6 @@ x = symbols("x")
 lib.get("calc_deriv_poly_001").build(expr=x**3 - 3*x)
 ```
 
-Track what you've used in past quizzes:
-
-```bash
-mathpaper history --course Calculus
-```
-
 ---
 
 ## Writing a new problem
@@ -134,14 +128,104 @@ The answer is computed from the expression — change `expr` and both the studen
 
 ---
 
+## Document structure
+
+Every item added to a `Test` is a `Block`. The two convenience constructors are:
+
+```python
+Problem(prompt, answer_space="1in", answer=None, points=None)
+MultipartProblem(prompt, parts, layout=None, figure=None, figure_layout=None, points=None)
+```
+
+Both return a `Block` — the single unified document node. The `body` of a `Block` is either a `FreeResponse` (leaf) or a `Parts` container (recursive).
+
+### Flat multipart problem
+
+```python
+MultipartProblem(
+    prompt=Text("Let $f(x) = x^2 - 4$. Answer the following."),
+    parts=[
+        Part("Find all real zeros.", answer=Math("x = -2, 2")),
+        Part("Find the y-intercept.", answer=Math("(0, -4)")),
+        Part("Describe the end behavior."),
+    ],
+    layout=PartsGrid(columns=2, answer_space="1.2in"),
+    points=6,
+)
+```
+
+### Nested sub-parts
+
+`Part.body` can be another `Parts` container, creating an arbitrarily deep tree. Each `Parts` node carries its own label scheme (`"alpha"`, `"roman"`, or `"numeric"`) and optional grid layout. By default, nested parts are indented.
+
+```python
+MultipartProblem(
+    prompt=Text("Let $f(x) = -2(x-3)^2 + 8$."),
+    parts=[
+        Part(
+            prompt=Text("Find the key features of $f$."),
+            body=Parts(
+                labels="roman",
+                layout=PartsGrid(columns=2, answer_space="0.9in"),
+                parts=[
+                    Part("State the vertex.", answer=Math("(3, 8)")),
+                    Part("State the axis of symmetry.", answer=Math("x = 3")),
+                    Part("Find the x-intercepts.", answer=Math("x = 1, 5")),
+                    Part("Find the y-intercept.", answer=Math("(0, -10)")),
+                ],
+            ),
+        ),
+        Part(
+            "State the range of $f$.",
+            answer=Math("(-infinity, 8]"),
+            answer_space="0.8in",
+        ),
+    ],
+    layout=PartsGrid(columns=1, answer_space="0.8in"),
+    points=10,
+)
+```
+
+This renders as:
+
+```
+1.  Let f(x) = -2(x-3)² + 8.
+
+    a.  Find the key features of f.
+
+        ┌─────────────────────────┬─────────────────────────┐
+        │ i.  State the vertex.   │ ii. State the axis …    │
+        │                         │                         │
+        │iii. Find the x-intercepts│ iv. Find the y-intercept│
+        │                         │                         │
+        └─────────────────────────┴─────────────────────────┘
+
+    b.  State the range of f.
+```
+
+Set `indent=False` on any `Parts` node to suppress the automatic left-padding.
+
+---
+
 ## Public API
 
 ```python
 # Documents
 Test(title, course="", version="")
-Problem(prompt, answer=None, answer_space=None, points=None)
-MultipartProblem(prompt, parts, figure=None, figure_layout=None, layout=None, points=None)
-Part(prompt, answer=None, answer_space=None)
+Problem(prompt, answer=None, answer_space="1in", points=None, keep_together=True)
+MultipartProblem(prompt, parts, layout=None, figure=None, figure_layout=None, points=None, keep_together=True)
+
+# Core document node (returned by Problem and MultipartProblem)
+Block(stem, body, answer=None, figure=None, figure_layout=None, points=None, keep_together=True)
+
+# Part body types
+FreeResponse(height="1in")
+Parts(parts, layout=None, labels="alpha", indent=True)
+
+# Parts
+Part(prompt, body=None, answer=None, answer_space=None)
+# body defaults to FreeResponse(answer_space or "1in")
+# body can be FreeResponse or Parts for nested sub-parts
 
 # Layout
 PartsGrid(columns=1, answer_space="1in")
@@ -167,18 +251,53 @@ quiz.write_typst(out_dir, mode)
 quiz.build(out_dir)
 ```
 
+### Label schemes
+
+| `labels=`   | Output         |
+|-------------|----------------|
+| `"alpha"`   | a, b, c, …     |
+| `"roman"`   | i, ii, iii, …  |
+| `"numeric"` | 1, 2, 3, …     |
+
+---
+
+## Figures
+
+The primary figure backend is **ManimCE**. Figures are rendered as static PNGs (last frame), white-background cropped, and cached in `.mathpaper_cache/figures/`.
+
+```python
+from mathpaper.figures.manim import ManimFigure
+from manim import Scene, Circle, BLUE
+
+class CircleFigure(ManimFigure):
+    def __init__(self, width="60%"):
+        class _Scene(Scene):
+            def construct(self):
+                self.add(Circle(color=BLUE))
+        super().__init__(_Scene, "circle.png", width)
+```
+
+Skip re-rendering and use the cached version:
+
+```bash
+MATHPAPER_NO_RENDER_FIGURES=1 python my_quiz.py
+# or
+mathpaper build my_quiz.py --no-render-figures
+```
+
+Matplotlib SVG is also supported for simpler graphs (`mathpaper.figures.matplotlib`).
+
 ---
 
 ## Examples
 
 | Example | File |
 |---|---|
-| Calculus derivatives quiz | [examples/calculus/derivatives_quiz.py](examples/calculus/derivatives_quiz.py) |
-| Algebra 2 polynomial quiz | [examples/algebra_2/polynomial_quiz.py](examples/algebra_2/polynomial_quiz.py) |
+| Algebra 2 polynomial quiz (with nested sub-parts) | [examples/algebra_2/polynomial_quiz.py](examples/algebra_2/polynomial_quiz.py) |
 | Calculus problem library | [problems/calculus/derivatives.py](problems/calculus/derivatives.py) |
 
 ```bash
-python examples/calculus/derivatives_quiz.py
+python examples/algebra_2/polynomial_quiz.py
 ```
 
 ---

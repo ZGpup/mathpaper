@@ -6,15 +6,19 @@
   "problems": [
     {
       "index": 1,
-      "type": "Problem"
+      "type": "Block"
     },
     {
       "index": 2,
-      "type": "MultipartProblem"
+      "type": "Block"
     },
     {
       "index": 3,
-      "type": "MultipartProblem"
+      "type": "Block"
+    },
+    {
+      "index": 4,
+      "type": "Block"
     }
   ]
 }

@@ -14,15 +14,19 @@ def collect_assets(blocks: list, assets_dir: Path) -> None:
 
 def _copy_block_assets(block, assets_dir: Path) -> None:
     from mathpaper.figures.base import Figure
+    from mathpaper.document.parts import Parts
 
     figure = getattr(block, "figure", None)
     if isinstance(figure, Figure):
         _copy_figure(figure, assets_dir)
 
-    for part in getattr(block, "parts", []):
-        part_figure = getattr(part, "figure", None)
-        if isinstance(part_figure, Figure):
-            _copy_figure(part_figure, assets_dir)
+    # Walk into the Parts body to find any part-level figures
+    body = getattr(block, "body", None)
+    if isinstance(body, Parts):
+        for part in body.parts:
+            part_figure = getattr(part, "figure", None)
+            if isinstance(part_figure, Figure):
+                _copy_figure(part_figure, assets_dir)
 
 
 def _copy_figure(figure: "Figure", assets_dir: Path) -> None:

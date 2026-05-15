@@ -22,20 +22,21 @@ The long-term aim is a publishable Python package for math educators, curriculum
 A user should be able to write Python like this:
 
 ```python
-from mathpaper import Test, MultipartProblem, Part
-from mathpaper.content import Math
-from mathpaper.layout import PartsGrid, SideFigure
-from mathpaper.figures import CoordinatePlane
-from mathpaper.math import polynomial_from_roots
+from mathpaper import Test, MultipartProblem, Part, Parts, PartsGrid, SideFigure
+from mathpaper.content import Math, Text
+from mathpaper.figures.manim import ManimFigure
+from mathpaper.math import polynomial_from_roots, sympy_to_typst
 
 poly = polynomial_from_roots([-3, 1, 4])
 
-graph = CoordinatePlane(
-    xlim=(-6, 6),
-    ylim=(-10, 10),
-    grid=True,
-    axes=True,
-).plot(poly)
+class PolyGraph(ManimFigure):
+    def __init__(self):
+        from manim import Scene, Axes, BLUE
+        class _Scene(Scene):
+            def construct(self):
+                ax = Axes(x_range=[-6, 6], y_range=[-10, 10])
+                self.add(ax, ax.plot(lambda x: (x+3)*(x-1)*(x-4), color=BLUE))
+        super().__init__(_Scene, "poly_graph.png", width="100%")
 
 quiz = Test(
     title="Polynomial Quiz",
@@ -45,8 +46,8 @@ quiz = Test(
 
 quiz.add(
     MultipartProblem(
-        prompt="Use the graph of $f$ to answer the questions.",
-        figure=graph,
+        prompt=Text("Use the graph of $f$ to answer the questions."),
+        figure=PolyGraph(),
         figure_layout=SideFigure(position="right", width="42%"),
         parts=[
             Part("Find all real zeros.", answer=Math(r"-3, 1, 4")),
@@ -71,25 +72,13 @@ out/polynomial_quiz/
   answer_key.typ
   answer_key.pdf
   assets/
-    graph_001.svg
+    poly_graph.png
   manifest.json
 ```
 
-The package should make common math-document tasks natural:
-
-- Numbered problems.
-- Multipart problems with parts `a`, `b`, `c`, etc.
-- Multi-column part layouts.
-- Answer spaces.
-- Side figures and top/bottom figures.
-- Student versions and answer keys.
-- Generated graphs and diagrams.
-- Reproducible random problem variants.
-- Clean, inspectable Typst source.
-
 ## Major design decision
 
-This package should use **Python -> Typst directly**.
+This package uses **Python -> Typst directly**.
 
 Rationale:
 
@@ -98,40 +87,121 @@ Rationale:
 - Python should own generation, asset creation, seeding, problem selection, and answer-key construction.
 - Typst should own page layout, typography, grids, spacing, headers, footers, and PDF rendering.
 
+## Document tree — the recursive Block model
+
+Every item added to `Test.add()` is a `Block`. `Problem` and `MultipartProblem` are plain constructor functions that return `Block`; they are not separate classes. The renderer only needs to handle one type at the top level.
+
+```
+Test._blocks: list[Block]
+
+Block
+  stem: Any                    # the top-level prompt (Text, Math, etc.)
+  body: FreeResponse | Parts   # leaf or recursive container
+  answer: Any | None           # top-level answer for solution mode
+  figure: Any | None           # optional figure (orthogonal to body)
+  figure_layout: Any | None    # SideFigure, etc.
+  points: int | None
+  keep_together: bool
+
+FreeResponse
+  height: str                  # e.g. "1in"
+
+Parts
+  parts: list[Part]
+  layout: Any                  # PartsGrid or None
+  labels: str                  # "alpha" | "roman" | "numeric"
+  indent: bool                 # wrap in #pad(left: 1.5em) when nested; default True
+
+Part
+  prompt: Any
+  body: FreeResponse | Parts   # FreeResponse built in __post_init__ if None
+  answer: Any | None           # shown in solution mode
+  answer_space: str | None     # backwards-compat shorthand → FreeResponse(height)
+```
+
+### Why `Problem` and `MultipartProblem` are functions, not classes
+
+`Problem(...)` returns `Block(stem=prompt, body=FreeResponse(answer_space), ...)`.
+`MultipartProblem(...)` returns `Block(stem=prompt, body=Parts(parts=..., layout=...), ...)`.
+
+All existing call sites are unchanged. The renderer does a single `isinstance(block, Block)` check and then walks `block.body` recursively. Adding a new answer region type (e.g. `MultipleChoice`, `TableResponse`) does not require changes to the problem-level rendering logic.
+
+### Label schemes
+
+The `Parts.labels` field controls the label prefix assigned to each child `Part`. The label is injected by the parent `Parts` container at render time — the `Part` itself is label-agnostic.
+
+| `labels=`   | Output         |
+|-------------|----------------|
+| `"alpha"`   | a, b, c, …     |
+| `"roman"`   | i, ii, iii, …  |
+| `"numeric"` | 1, 2, 3, …     |
+
+### Indentation
+
+When `Part.body` is a `Parts` node and `parts.indent` is `True` (the default), the renderer wraps the sub-block in `#pad(left: 1.5em)[...]`. Each nesting level stacks another 1.5em. Set `indent=False` to suppress.
+
+### Grid layout at any nesting level
+
+`PartsGrid(columns=N)` on a `Parts` node renders its parts in an N-column Typst grid. This works at any depth:
+
+```python
+Part(
+    prompt=Text("Find the key features."),
+    body=Parts(
+        labels="roman",
+        layout=PartsGrid(columns=2, answer_space="0.9in"),
+        parts=[...],   # i, ii in row 1; iii, iv in row 2
+    ),
+)
+```
+
+Produces:
+
+```
+a.  Find the key features.
+
+    ┌──────────────────┬──────────────────┐
+    │ i.  …            │ ii.  …           │
+    │iii.  …           │ iv.  …           │
+    └──────────────────┴──────────────────┘
+```
+
 ## Public API philosophy
 
 The stable public API should be the **Python object model**, not raw Typst strings.
 
-Good public API:
+Stable public API:
 
 ```python
 Test(...)
-Problem(...)
-MultipartProblem(...)
+Block(...)
+Problem(...)          # constructor function → Block
+MultipartProblem(...) # constructor function → Block
+FreeResponse(...)
+Parts(...)
 Part(...)
 PartsGrid(...)
 SideFigure(...)
 AnswerSpace(...)
 Figure(...)
 Math(...)
+Text(...)
 RawTypst(...)
 TypstRenderer(...)
-TypstTheme(...)
 quiz.to_typst()
 quiz.write_typst(...)
 quiz.build(...)
 ```
 
-Avoid making low-level renderer functions part of the stable API:
+Keep private or explicitly experimental:
 
 ```python
-_render_problem(...)
-_emit_parts_grid(...)
+_render_block(...)
+_render_parts_node(...)
+_render_part(...)
+_generate_labels(...)
 _escape_typst_string(...)
-_render_multipart_problem(...)
 ```
-
-These can exist internally, but they should be private or explicitly experimental.
 
 ### Typst exposure
 
@@ -143,12 +213,71 @@ Expose:
 - `quiz.to_typst()` for debugging and inspection.
 - `quiz.write_typst(path)` for writing source without compiling.
 - `TypstRenderer` for advanced renderer control.
-- `TypstTheme` or similar for theme/page customization.
 - Optional preamble/template overrides.
 
 But the normal user should rarely need to write raw Typst.
 
-## Proposed package structure
+## Figure backend
+
+The primary figure backend is **ManimCE**. Figures render as static PNGs (last frame of the scene), with white background and automatic whitespace cropping applied. Rendered files are cached in `.mathpaper_cache/figures/`.
+
+### ManimFigure pattern
+
+```python
+from mathpaper.figures.manim import ManimFigure
+from manim import Scene
+
+class MyFigure(ManimFigure):
+    def __init__(self, param, width="80%"):
+        class _Scene(Scene):
+            def construct(self):
+                ...  # param accessible via closure
+        super().__init__(_Scene, "my_figure.png", width)
+```
+
+The inner class closes over constructor parameters. The cache key is the filename — two scenes with the same filename will collide. Content-addressed caching (hash-based) is a planned improvement.
+
+### Rendering control
+
+```bash
+MATHPAPER_NO_RENDER_FIGURES=1 python my_quiz.py   # skip render, use cached PNG
+mathpaper build my_quiz.py --no-render-figures     # same via CLI flag
+```
+
+When no cached file exists and rendering is skipped, a gray placeholder PNG is produced automatically.
+
+Matplotlib SVG is also supported via `mathpaper.figures.matplotlib` for simpler graphs.
+
+## Problem library and @problem decorator
+
+Problems are `@problem`-decorated functions. The decorator attaches metadata and registers the function in the module's `_PROBLEMS` list. `ProblemLibrary` scans directories, loads files dynamically, and indexes problems by id.
+
+```python
+@problem(
+    id="calc_deriv_poly_001",
+    tags=["calculus", "derivatives"],
+    topic="Derivatives",
+    description="Find f'(x) for a degree-4 polynomial",
+    difficulty="easy",    # "easy" | "medium" | "hard"
+    course="Calculus",
+)
+def calc_deriv_poly_001(expr=None) -> Problem | MultipartProblem:
+    ...
+    return Problem(...)
+```
+
+The function should return a `Problem` or `MultipartProblem` (both produce `Block`). Default parameters serve as the canonical example; callers can override them via `.build(expr=...)`.
+
+## Planned repository split
+
+Once the engine API is stable, problem content will live in a separate repo (`mathpaper-problems`) that depends on `mathpaper` as a package. The `problems/` directory in this repo is the transitional home for content under development. The `personal/` directory holds private/experimental problems.
+
+The split is deferred until the following are stable:
+- The `@problem` return type contract
+- The `Block`/`Parts`/`Part`/`FreeResponse` recursive structure
+- The `ManimFigure` cache strategy
+
+## Package structure
 
 ```text
 mathpaper/
@@ -157,7 +286,7 @@ mathpaper/
   README.md
   LICENSE
   CHANGELOG.md
-  AGENT.md
+  CLAUDE.md
   docs/
   examples/
   tests/
@@ -166,15 +295,16 @@ mathpaper/
     mathpaper/
       __init__.py
       cli.py
+      app.py
 
       document/
         __init__.py
         test.py
+        problem.py       # Block dataclass; Problem() and MultipartProblem() constructors
+        parts.py         # FreeResponse, Parts, Part
         section.py
-        problem.py
-        parts.py
         solution.py
-        layout.py
+        layout.py        # PartsGrid, SideFigure, AnswerSpace
 
       content/
         __init__.py
@@ -187,6 +317,7 @@ mathpaper/
         __init__.py
         expressions.py
         polynomials.py
+        calculus.py
         systems.py
         geometry.py
         randomization.py
@@ -200,15 +331,21 @@ mathpaper/
         stat_plots.py
         svg.py
         matplotlib.py
-        manim.py
+        manim.py          # ManimFigure base class; primary backend
 
       render/
         __init__.py
-        typst.py
+        typst.py          # TypstRenderer; recursive _render_parts_node/_render_part
         compiler.py
         escaping.py
         assets.py
         context.py
+
+      library/
+        __init__.py
+        decorator.py      # @problem decorator; ProblemDef dataclass
+        registry.py       # ProblemLibrary
+        usage.py
 
       templates/
         typst/
@@ -223,9 +360,6 @@ mathpaper/
             compact.typ
             exam.typ
 
-      resources/
-        images/
-
       utils/
         __init__.py
         paths.py
@@ -233,237 +367,15 @@ mathpaper/
         cache.py
 
   examples/
-    hello_typst/
-      notebook.ipynb
-      build.py
-    algebra_1/
-      linear_equations.py
     algebra_2/
-      polynomial_quiz.py
-    geometry/
-      triangle_worksheet.py
-
-  tests/
-    test_problem_model.py
-    test_typst_rendering.py
-    test_figures.py
-    test_builds.py
+      polynomial_quiz.py  # includes nested sub-parts demo (Parts(labels="roman", columns=2))
+  problems/
+    calculus/
+      derivatives.py
+  personal/
+    test3/
+      scratch.py
 ```
-
-## Implementation roadmap
-
-### Phase 1: Minimal renderer
-
-Implement enough to create a simple PDF from Python objects.
-
-Required objects:
-
-- `Test`
-- `Problem`
-- `MultipartProblem`
-- `Part`
-- `Text`
-- `Math`
-- `RawTypst`
-- `AnswerSpace`
-- `PartsGrid`
-- `Figure`
-- `TypstRenderer`
-
-Minimum methods:
-
-```python
-quiz.add(block)
-quiz.to_typst(mode="student")
-quiz.to_typst(mode="solution")
-quiz.write_typst(out_dir, mode="student")
-quiz.build(out_dir)
-```
-
-Minimum output:
-
-- `main.typ`
-- `main.pdf`
-- `answer_key.typ`
-- `answer_key.pdf`
-- `assets/` directory
-
-### Phase 2: Typst template library
-
-Create bundled Typst templates/macros.
-
-Needed Typst files:
-
-- `lib.typ`: imports and exports all template helpers.
-- `page.typ`: page setup, headers, footers, title block.
-- `problems.typ`: problem numbering and problem containers.
-- `parts.typ`: part labels, part grids, answer spaces.
-- `figures.typ`: image placement helpers, side figures.
-- `solutions.typ`: solution/answer-key formatting.
-- `themes/default.typ`: default visual style.
-- `themes/compact.typ`: denser worksheet style.
-- `themes/exam.typ`: test/exam style.
-
-Generated `main.typ` should import bundled template helpers and then use high-level Typst functions, not raw low-level grid/page code everywhere.
-
-Example target Typst:
-
-```typst
-#import "mathpaper.typ": *
-
-#show: test-template.with(
-  title: "Polynomial Quiz",
-  course: "Algebra 2",
-  version: "A",
-)
-
-#problem(points: 4)[
-  Factor completely.
-
-  $x^2 - 7x + 12$
-
-  #answer-space(1.2in)
-]
-
-#multipart-problem(points: 8)[
-  Use the graph to answer the questions.
-
-  #side-figure(
-    figure: image("assets/poly_001.svg", width: 42%),
-    body: [
-      #parts-grid(columns: 2, answer-space: 0.9in, (
-        [Find the zeros.],
-        [Find the y-intercept.],
-        [State the end behavior.],
-        [Where is $f(x) > 0$?],
-      ))
-    ],
-  )
-]
-```
-
-### Phase 3: Figure generation
-
-Add figure abstractions that normalize different graphics backends into assets.
-
-Initial figure types:
-
-- `Figure(path, width="...")`
-- `CoordinatePlane`
-- `NumberLine`
-
-Initial backend:
-
-- Matplotlib -> SVG
-
-Later backends:
-
-- custom SVG generation
-- Plotly/Kaleido
-- Manim still frames
-- optional Desmos-style renderer, if truly needed
-
-Default output should prefer vector graphics, especially SVG or PDF. Avoid screenshots as the default.
-
-### Phase 4: Randomized variants and answer keys
-
-Add deterministic seeding.
-
-Useful concepts:
-
-- `seed`
-- `variant`
-- `ProblemSpec`
-- `GeneratedProblem`
-- `manifest.json`
-
-A generated output folder should record enough information to reproduce the document.
-
-Example `manifest.json`:
-
-```json
-{
-  "title": "Polynomial Quiz",
-  "version": "A",
-  "seed": 12345,
-  "created_by": "mathpaper 0.1.0",
-  "problems": [
-    {
-      "id": "poly_roots_001",
-      "seed": 101,
-      "points": 8,
-      "assets": ["assets/graph_001.svg"]
-    }
-  ]
-}
-```
-
-### Phase 5: Examples and tests
-
-Examples should double as product demos and integration tests.
-
-Create examples for:
-
-- Algebra 1: linear equations worksheet.
-- Algebra 2: polynomial graph quiz.
-- Geometry: triangle/circle worksheet.
-- Precalculus: trig graphing worksheet.
-- Statistics: normal distribution or scatterplot problem set.
-
-Testing strategy:
-
-1. Unit tests for the object model.
-2. Snapshot tests for generated Typst.
-3. Compile tests that call `typst compile`, marked separately because they require Typst installed.
-
-## Important layout requirements
-
-The package should eventually support:
-
-- Automatic problem numbering.
-- Part labels `a`, `b`, `c`, etc.
-- Multi-column parts.
-- Side-by-side layouts.
-- Figures placed left, right, top, bottom, or full-width.
-- Explicit answer spaces.
-- Point values.
-- Page breaks.
-- Keep-together problem blocks.
-- Compact and spacious variants.
-- Student-only and solution-only content.
-
-True floating/wrapped figures should not be a core requirement at first. Prefer explicit side-by-side layouts because they are more robust for tests and worksheets.
-
-## Content model guidance
-
-Do not represent every piece of content as a bare string.
-
-Use content objects such as:
-
-```python
-Text("Explain your reasoning.")
-Math(r"x^2 - 7x + 12")
-RawTypst("#v(1in)")
-Figure("assets/graph.svg")
-StudentOnly(...)
-SolutionOnly(...)
-```
-
-This makes rendering safer and keeps the door open for future non-Typst backends.
-
-## Typst rendering guidance
-
-Generated Typst should be:
-
-- readable,
-- debuggable,
-- reasonably high-level,
-- backed by template macros,
-- stable enough for users to inspect.
-
-The renderer should escape user text properly. Raw Typst should only be inserted when explicitly wrapped in `RawTypst`.
-
-The output directory should contain all assets needed by Typst. Avoid referencing files outside the Typst project root unless the user explicitly configures this.
 
 ## Development environment
 
@@ -478,18 +390,15 @@ The package is installed in editable mode there (`pip install -e .`), so imports
 
 ## Dependencies
 
-Core package dependencies should stay modest.
-
-Likely core dependencies:
+Core:
 
 - `sympy`
 - `numpy`
 - `matplotlib`
 - `jinja2`
-- `pydantic` or dataclasses only
 - `platformdirs`
 
-Dev dependencies:
+Dev:
 
 - `pytest`
 - `ruff`
@@ -498,79 +407,51 @@ Dev dependencies:
 - `twine`
 - `pre-commit`
 
-Optional dependencies:
+Optional:
 
-- `plotly`
-- `kaleido`
-- `manim`
+- `manim` (primary figure backend)
+- `plotly` + `kaleido`
 
-Typst itself is assumed to be installed separately and available on `PATH` as `typst`.
-
-## CLI ideas
-
-A CLI is useful, but it should not be overbuilt early.
-
-Possible commands:
-
-```bash
-mathpaper build path/to/script.py
-mathpaper new algebra-quiz
-mathpaper clean out/
-mathpaper check-typst
-```
-
-Initial implementation can be much simpler. The Python API matters more than the CLI.
+Typst is assumed to be installed separately and available on `PATH` as `typst`.
 
 ## Development principles
 
 1. Build the object model first.
 2. Keep Typst generation direct and inspectable.
 3. Use Typst for layout; use Python for generation.
-4. Prefer vector graphics.
-5. Avoid screenshot workflows as defaults.
-6. Make answer keys first-class.
-7. Make deterministic randomization easy.
-8. Do not add Quarto to the core pipeline.
-9. Keep raw Typst available as an advanced escape hatch.
-10. Keep early scope small but design for expansion.
+4. Prefer vector graphics; Manim is the primary figure backend.
+5. Make answer keys first-class.
+6. Make deterministic randomization easy.
+7. Do not add Quarto to the core pipeline.
+8. Keep raw Typst available as an advanced escape hatch.
+9. Keep early scope small but design for expansion.
+10. The document tree is recursive — `Part.body` can be `FreeResponse` or `Parts`.
 
-## First serious milestone
+## Resolved design decisions
 
-Build one Algebra 2 quiz from Python with:
-
-- title/header/name line,
-- numbered problems,
-- one ordinary free-response problem,
-- one multipart problem with parts `a` through `d`,
-- two-column part layout,
-- one generated coordinate graph as SVG,
-- side-figure layout,
-- answer spaces,
-- student PDF,
-- answer-key PDF.
-
-This milestone should drive the first real API and template decisions.
+- **`Problem` and `MultipartProblem` are constructor functions, not classes.** Both return `Block`. The renderer handles one type.
+- **The document tree is recursive.** `Part.body` is either `FreeResponse` (leaf) or `Parts` (nested). Label scheme (`alpha`, `roman`, `numeric`) lives on the `Parts` container, not on individual `Part` objects.
+- **Indentation at each nesting level.** `Parts.indent=True` (default) wraps the sub-block in `#pad(left: 1.5em)` in Typst. Stacks automatically with depth.
+- **Grid layout works at any nesting depth.** `PartsGrid(columns=N)` on an inner `Parts` node produces a multi-column grid inside an indented block.
+- **Manim is the primary figure backend.** PNG output, white background, auto-cropped, cached in `.mathpaper_cache/figures/`.
+- **`Part.answer_space` is a backwards-compatible shorthand.** It initializes `Part.body = FreeResponse(answer_space)` in `__post_init__`. Existing problem code is unaffected.
 
 ## Open design questions
 
-- Should `Math(...)` accept LaTeX-like syntax and convert to Typst math, or should users write Typst math directly?
-- How much LaTeX compatibility should be supported?
-- Should `Part.answer_space` override the parent layout answer space?
+- Should `Math(...)` accept LaTeX-like syntax and convert to Typst math, or should users write Typst math directly? (Currently: Typst math directly.)
 - Should answer keys mirror student layout or use a compact solution layout?
 - How should custom themes be defined: Python objects, Typst overrides, or both?
 - Should figure generation be eager or lazy?
-- Should assets be content-addressed by hash to avoid regeneration?
-- Should problem generators live in the main package or in optional curriculum modules?
+- Should assets be content-addressed by hash to avoid regeneration? (Currently: filename-based; collision risk.)
+- Should problem generators live in the main package or in optional curriculum modules? (Planned: separate `mathpaper-problems` repo.)
+- What is the standard `seed` parameter convention for randomized problem variants?
+- Should `MultipleChoice`, `TableResponse`, and other answer region types be added? (Planned, not yet implemented.)
 
 ## Current immediate next steps
 
-1. Create the minimal package skeleton under `src/mathpaper/`.
-2. Implement a very small `TypstRenderer` that writes `hello.typ` from Python.
-3. Add `Test`, `Problem`, and `Text` objects.
-4. Add `to_typst()` and `build()` methods.
-5. Add a bundled `templates/typst/lib.typ` file, even if it starts nearly empty.
-6. Add a notebook or script that builds a one-page PDF.
-7. Add PDF preview helper using PyMuPDF for notebooks.
-8. Add first multipart problem and parts grid.
-9. Add first SVG coordinate graph asset.
-10. Add answer-key mode.
+1. Lock down the `@problem` return type (annotate `-> Block`, validate in decorator).
+2. Add `seed: int | None = None` as a standard `@problem` parameter convention.
+3. Content-address the Manim figure cache (hash-based filename, not user-supplied).
+4. Add `MultipleChoiceProblem` / `MultipleChoice` answer region type.
+5. Add `TableResponse` answer region type (fill in a table of values).
+6. Split content into a separate `mathpaper-problems` repository once the above are stable.
