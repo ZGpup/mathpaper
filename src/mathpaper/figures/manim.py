@@ -1,4 +1,5 @@
 """ManimCE-backed figure base class."""
+import hashlib
 import os
 import shutil
 import tempfile
@@ -8,6 +9,13 @@ from typing import Type
 from mathpaper.figures.base import Figure
 
 _FIGURE_CACHE = Path(".mathpaper_cache/figures")
+
+
+def _cache_path(scene_class: Type, filename: str) -> Path:
+    # Namespace by scene class qualname so two figures with the same filename
+    # don't collide. sha1[:12] gives 48 bits — negligible collision probability.
+    ns = hashlib.sha1(scene_class.__qualname__.encode()).hexdigest()[:12]
+    return _FIGURE_CACHE / ns / filename
 
 
 def _make_placeholder(dest: Path) -> Path:
@@ -36,9 +44,12 @@ class ManimFigure(Figure):
     White background and whitespace cropping are applied automatically so the
     PNG asset contains only the diagram content plus a small padding border.
 
-    Rendered files are cached in .mathpaper_cache/figures/. Set the env var
-    MATHPAPER_NO_RENDER_FIGURES=1 (or use `mathpaper build --no-render-figures`)
-    to skip re-rendering and reuse the cached PNG instead.
+    Rendered files are cached in .mathpaper_cache/figures/<hash>/<filename>.
+    The hash is derived from the scene class's qualified name, so two figures
+    with the same filename but different scene classes will not collide. Set
+    the env var MATHPAPER_NO_RENDER_FIGURES=1 (or use
+    `mathpaper build --no-render-figures`) to skip re-rendering and reuse the
+    cached PNG instead.
 
     Subclasses define the scene as an inner class inside __init__ so it can
     close over constructor parameters, then call super().__init__().
@@ -54,13 +65,14 @@ class ManimFigure(Figure):
     """
 
     def __init__(self, scene_class: Type, filename: str, width: str = "80%"):
-        cached = _FIGURE_CACHE / filename
+        cached = _cache_path(scene_class, filename)
+
+        if cached.exists():
+            super().__init__(path=str(cached), width=width)
+            return
 
         if os.environ.get("MATHPAPER_NO_RENDER_FIGURES"):
-            if cached.exists():
-                super().__init__(path=str(cached), width=width)
-            else:
-                super().__init__(path=str(_make_placeholder(cached)), width=width)
+            super().__init__(path=str(_make_placeholder(cached)), width=width)
             return
 
         try:
@@ -73,31 +85,34 @@ class ManimFigure(Figure):
         tmpdir = Path(tempfile.mkdtemp())
         stem = Path(filename).stem
 
-        with tempconfig({
-            "media_dir": str(tmpdir),
-            "save_last_frame": True,
-            "write_to_movie": False,
-            "output_file": stem,
-            "background_color": "#ffffff",
-            "verbosity": "WARNING",
-            "disable_caching": True,
-        }):
-            scene = scene_class()
-            scene.render()
+        try:
+            with tempconfig({
+                "media_dir": str(tmpdir),
+                "save_last_frame": True,
+                "write_to_movie": False,
+                "output_file": stem,
+                "background_color": "#ffffff",
+                "verbosity": "WARNING",
+                "disable_caching": True,
+            }):
+                scene = scene_class()
+                scene.render()
 
-        pngs = list(tmpdir.rglob("*.png"))
-        if not pngs:
-            raise RuntimeError(
-                f"ManimFigure: no PNG produced by scene {scene_class.__name__!r}. "
-                "Ensure the scene calls self.add() with at least one mobject."
-            )
+            # Sort by mtime so the most-recently-written PNG is last; this
+            # avoids picking up thumbnails or partial frames Manim may write.
+            pngs = sorted(tmpdir.rglob("*.png"), key=lambda p: p.stat().st_mtime)
+            if not pngs:
+                raise RuntimeError(
+                    f"ManimFigure: no PNG produced by scene {scene_class.__name__!r}. "
+                    "Ensure the scene calls self.add() with at least one mobject."
+                )
 
-        self._crop_whitespace(pngs[0])
-        dest = tmpdir / filename
-        pngs[0].rename(dest)
-
-        _FIGURE_CACHE.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(dest, cached)
+            self._crop_whitespace(pngs[-1])
+            cached.parent.mkdir(parents=True, exist_ok=True)
+            # shutil.copy2 works across filesystems; Path.rename() does not.
+            shutil.copy2(pngs[-1], cached)
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
         super().__init__(path=str(cached), width=width)
 
@@ -107,10 +122,10 @@ class ManimFigure(Figure):
         import numpy as np
         from PIL import Image
 
-        img = Image.open(path).convert("RGBA")
+        # Convert to RGB: background is always forced white, so alpha is unused.
+        img = Image.open(path).convert("RGB")
         arr = np.array(img)
 
-        # Background = near-white opaque pixels (threshold handles anti-aliasing)
         is_bg = (arr[:, :, 0] >= 250) & (arr[:, :, 1] >= 250) & (arr[:, :, 2] >= 250)
         content = ~is_bg
 

@@ -551,18 +551,12 @@ exam.add(MultipartProblem(
 #                                  └── Part iii → FreeResponse
 # ===========================================================================
 exam.add(MultipartProblem(
-    prompt=Text(
-        "Give a precise definition for each property. "
-        "Note how indentation changes between (a), (b), and (c)."
-    ),
+    prompt=Text("Give a precise definition for each property."),
     parts=Parts(
         labels="alpha",
         parts=[
             Part(
-                prompt=Text(
-                    "Continuity of $f$ at $x = c$  "
-                    "(sub-parts indented — indent=True, the default):"
-                ),
+                prompt=Text("Continuity of $f$ at $x = c$:"),
                 body=Parts(
                     labels="roman",
                     indent=True,
@@ -574,10 +568,7 @@ exam.add(MultipartProblem(
                 ),
             ),
             Part(
-                prompt=Text(
-                    "Differentiability of $f$ at $x = c$  "
-                    "(sub-parts flush — indent=False):"
-                ),
+                prompt=Text("Differentiability of $f$ at $x = c$:"),
                 body=Parts(
                     labels="roman",
                     indent=False,
@@ -598,10 +589,7 @@ exam.add(MultipartProblem(
                 ),
             ),
             Part(
-                prompt=Text(
-                    "Uniform continuity of $f$ on $(a, b)$  "
-                    "(also flush — indent=False):"
-                ),
+                prompt=Text("Uniform continuity of $f$ on $(a, b)$:"),
                 body=Parts(
                     labels="roman",
                     indent=False,
