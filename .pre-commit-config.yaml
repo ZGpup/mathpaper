@@ -1,0 +1,10 @@
+repos:
+  - repo: local
+    hooks:
+      - id: pytest-on-main
+        name: Run pytest before committing to main
+        entry: scripts/run_tests_on_main.sh
+        language: script
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]

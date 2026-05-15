@@ -1,70 +1,128 @@
 # mathpaper
 
-A math problem library and test builder for educators. Search a growing bank of tagged, curriculum-aligned problems, preview them rendered, and assemble a print-ready PDF quiz — without writing code. When you need a new problem type, write one Python function and it joins the library permanently.
+A Python-first toolkit for building math tests, quizzes, and worksheets.
+Pick problems from a tagged library, arrange them in a quiz, and produce
+a print-ready PDF and answer key — in code or in a browser.
+
+```
+Python objects  →  Typst source  →  PDF (student + answer key)
+```
 
 ---
 
-## Setup
+## 1. Install
 
-**Requirements:** [Typst](https://typst.app/) installed and on your PATH.
+You need:
+
+- **Python 3.11+** (managed by conda below)
+- **[Typst](https://typst.app/)** on your `PATH` — used to render PDFs
+
+### macOS / Linux setup
 
 ```bash
+# 1. clone
 git clone https://github.com/your-username/mathpaper
 cd mathpaper
-conda env create -f environment.yml   # creates the mathpaper-dev environment
+
+# 2. create and activate the conda env (defines all deps)
+conda env create -f environment.yml
 conda activate mathpaper-dev
+
+# 3. install Typst
+brew install typst              # macOS
+# or: cargo install typst-cli   # any platform with rust
+# or download a binary from https://github.com/typst/typst/releases
+
+# 4. (optional) install pre-commit so tests run before commits to main
+pre-commit install
 ```
 
-For the browser test builder, also install the explore extras:
+### Verify everything works
 
 ```bash
-pip install ".[explore]"
+mathpaper check-typst           # should print: typst found: typst x.y.z
+pytest -q                       # should print: N passed
 ```
 
-Verify everything is working:
-
-```bash
-mathpaper check-typst
-mathpaper index ./problems
-```
+If any of the steps fail, jump to **Troubleshooting** at the bottom.
 
 ---
 
-## Browser test builder
+## 2. Where to put your own tests and quizzes
 
-The fastest way to build a quiz. No code required.
+The package lives in `src/mathpaper/`. The repo also includes:
 
-```bash
-conda activate mathpaper-dev
-mathpaper explore ./problems
+```
+problems/   ← shared problem library (curriculum-aligned, version-controlled)
+examples/   ← example quiz scripts that import from problems/
+personal/   ← your private quizzes — git-ignored, never committed
+out/        ← build outputs — git-ignored
 ```
 
-This opens a local browser UI where you can:
+`personal/` is the recommended place for quizzes you're writing for your
+own classes. Create one folder per class or unit:
 
-- Search problems by topic, tag, course, difficulty, or keyword
+```
+personal/
+  algebra2_unit3/
+    quiz_polynomials.py
+    test_chapter_review.py
+```
+
+Inside any of those files, write a script that builds a `Test`. Run it:
+
+```bash
+mathpaper build personal/algebra2_unit3/quiz_polynomials.py
+# or, equivalently
+python personal/algebra2_unit3/quiz_polynomials.py
+```
+
+Output PDFs land in whatever directory the script passes to `quiz.build(...)`
+(by convention, `out/<name>/`).
+
+> If you'd rather keep your quizzes outside this repo, point a script in
+> any directory at the installed package — `from mathpaper import Test, ...`
+> works as long as `mathpaper-dev` is active. Only the `personal/` folder
+> convention matters here; the package itself doesn't care about location.
+
+---
+
+## 3. Using the problem library
+
+`problems/` holds reusable, tagged problem generators. Each one is a Python
+function decorated with `@problem(...)`. The library indexes them by id, tag,
+topic, difficulty, and course.
+
+You have three ways to use the library.
+
+### 3a. Browser test builder *(easiest)*
+
+```bash
+pip install ".[explore]"        # one-time: install streamlit + pymupdf
+mathpaper explore ./problems    # opens a local browser UI
+```
+
+In the browser you can:
+
+- Filter problems by topic / course / difficulty / keywords
 - Preview any problem as a rendered PDF
-- Select problems and arrange them into a test
-- Set the title, course, and version
-- Click **Build PDF** to produce student and answer-key PDFs in one step
-- Click **Export .py** to get a Python script you can customize further
+- Click **+ Add to test** to assemble a quiz
+- Set the title, course, version
+- Click **Build PDF** to generate `main.pdf` (student) and `answer_key.pdf`
+- Click **Export .py** to download an equivalent Python script you can edit
 
-> Requires the `explore` extras (`pip install ".[explore]"`)
+> Errors: if "preview failed" appears, run `mathpaper check-typst` first.
 
----
-
-## Problem library
-
-Problems are stored as tagged Python functions in the `problems/` directory. The library loads them at startup — no database to maintain, no migration scripts, just Python files you can version-control and share.
-
-### Search from the command line
+### 3b. Command line
 
 ```bash
-mathpaper search --tag derivatives
-mathpaper search --topic "Implicit Differentiation" --difficulty hard
-mathpaper search --course Calculus --keywords "critical points"
+mathpaper index ./problems                      # build problems/catalog.json
+mathpaper search ./problems --tag derivatives
+mathpaper search ./problems --topic "Implicit Differentiation" --difficulty hard
+mathpaper search ./problems --course Calculus --keywords "critical points"
 ```
 
-### Use from a script
+### 3c. From a Python script
 
 ```python
 from mathpaper import Test
@@ -73,49 +131,60 @@ from mathpaper.library import ProblemLibrary
 lib = ProblemLibrary("./problems")
 
 quiz = Test(title="Derivatives Quiz", course="Calculus", version="A")
-for p in lib.search(tags=["derivatives"]):
+
+# Pull by id
+quiz.add(lib.get("calc_deriv_poly_001").build())
+
+# Or pull all problems with a tag
+for p in lib.search(tags=["implicit-differentiation"]):
     quiz.add(p.build())
 
-quiz.build("out/quiz")
-# out/quiz/main.pdf        ← student version
-# out/quiz/answer_key.pdf  ← answer key (computed, not hand-written)
+quiz.build("out/derivatives_quiz")
+# Produces:
+#   out/derivatives_quiz/main.typ
+#   out/derivatives_quiz/main.pdf          ← student version
+#   out/derivatives_quiz/answer_key.typ
+#   out/derivatives_quiz/answer_key.pdf    ← answer key (computed)
+#   out/derivatives_quiz/manifest.json
 ```
 
-Swap a problem's values without editing the library:
+Override a problem's defaults to get a different version of the same template:
 
 ```python
 from sympy import symbols
 x = symbols("x")
 
-lib.get("calc_deriv_poly_001").build(expr=x**3 - 3*x)
+quiz.add(lib.get("calc_deriv_poly_001").build(expr=x**3 - 3*x))
 ```
 
 ---
 
-## Writing a new problem
+## 4. Writing a new problem
 
-Add a `@problem`-decorated function to any `.py` file under `problems/`. Run `mathpaper index ./problems` afterward and it appears in search immediately.
+Drop a `@problem`-decorated function into any `.py` file under `problems/`.
+Run `mathpaper index ./problems` afterward (or just restart the browser app)
+and it appears in search immediately.
 
 ```python
-# problems/calculus/derivatives.py
-from mathpaper import Problem, Text, Math
-from mathpaper.library import problem
-from mathpaper.math.calculus import derivative
-from mathpaper.math import sympy_to_typst
+# problems/calculus/my_problem.py
 from sympy import symbols
+from mathpaper import Math, Problem, Text
+from mathpaper.library import problem
+from mathpaper.math import sympy_to_typst
+from mathpaper.math.calculus import derivative
 
 x = symbols("x")
 
 @problem(
-    id="calc_deriv_poly_001",
+    id="calc_deriv_poly_002",
     tags=["calculus", "derivatives", "polynomial"],
     topic="Derivatives",
-    description="Find f'(x) for a degree-4 polynomial",
+    description="Find f'(x) for a cubic polynomial",
     difficulty="easy",
     course="Calculus",
 )
-def calc_deriv_poly_001(expr=None):
-    e = expr or x**4 - 8*x**2 + 7
+def calc_deriv_poly_002(expr=None):
+    e = expr if expr is not None else x**3 - 6*x + 4
     return Problem(
         prompt=Text(f"Let $f(x) = {sympy_to_typst(e)}$. Find $f'(x)$."),
         answer=Math(f"f'(x) = {sympy_to_typst(derivative(e))}"),
@@ -124,134 +193,34 @@ def calc_deriv_poly_001(expr=None):
     )
 ```
 
-The answer is computed from the expression — change `expr` and both the student worksheet and the answer key update automatically.
+The answer is computed from the expression — change `expr` and both the
+student worksheet and the answer key update automatically.
 
----
+### Rules for writing a problem (AI-friendly summary)
 
-## Document structure
+A `@problem` function must:
 
-Every item added to a `Test` is a `Block`. The two convenience constructors are:
+1. Be defined in a `.py` file somewhere under `problems/`.
+2. Be decorated with `@problem(id=..., tags=[...], topic=..., description=..., difficulty=..., course=...)`.
+3. Take only keyword arguments (with defaults) so it can be called with no args.
+4. Return either `Problem(...)` or `MultipartProblem(...)` — both return a `Block`.
+5. Have a globally unique `id` (use a stable prefix like `<course>_<topic>_<n>`).
 
-```python
-Problem(prompt, answer_space="1in", answer=None, points=None)
-MultipartProblem(prompt, parts, layout=None, figure=None, figure_layout=None, points=None)
-```
+Inside the function you can use:
 
-Both return a `Block` — the single unified document node. The `body` of a `Block` is either a `FreeResponse` (leaf) or a `Parts` container (recursive).
+| What you want | What to use |
+|---|---|
+| Plain text prompt | `Text("…")` |
+| Math expression | `Math(r"x^2 + 1")` (Typst math syntax, not LaTeX) |
+| Inline math inside text | put `$…$` directly inside a `Text(...)` string |
+| Convert a SymPy expression to Typst | `sympy_to_typst(expr)` |
+| Single free-response problem | `Problem(prompt=..., answer=..., answer_space="1in", points=N)` |
+| Multipart problem (a, b, c, …) | `MultipartProblem(prompt=..., parts=[Part(...), ...], layout=PartsGrid(columns=2), points=N)` |
+| Nested sub-parts (i, ii, iii inside a) | `Part(prompt=..., body=Parts(labels="roman", layout=PartsGrid(columns=2), parts=[Part(...), ...]))` |
+| Raw Typst escape hatch | `RawTypst("#v(0.5in)")` |
+| Side-by-side figure | pass `figure=...` and `figure_layout=SideFigure(width="40%")` to `MultipartProblem` |
 
-### Flat multipart problem
-
-```python
-MultipartProblem(
-    prompt=Text("Let $f(x) = x^2 - 4$. Answer the following."),
-    parts=[
-        Part("Find all real zeros.", answer=Math("x = -2, 2")),
-        Part("Find the y-intercept.", answer=Math("(0, -4)")),
-        Part("Describe the end behavior."),
-    ],
-    layout=PartsGrid(columns=2, answer_space="1.2in"),
-    points=6,
-)
-```
-
-### Nested sub-parts
-
-`Part.body` can be another `Parts` container, creating an arbitrarily deep tree. Each `Parts` node carries its own label scheme (`"alpha"`, `"roman"`, or `"numeric"`) and optional grid layout. By default, nested parts are indented.
-
-```python
-MultipartProblem(
-    prompt=Text("Let $f(x) = -2(x-3)^2 + 8$."),
-    parts=[
-        Part(
-            prompt=Text("Find the key features of $f$."),
-            body=Parts(
-                labels="roman",
-                layout=PartsGrid(columns=2, answer_space="0.9in"),
-                parts=[
-                    Part("State the vertex.", answer=Math("(3, 8)")),
-                    Part("State the axis of symmetry.", answer=Math("x = 3")),
-                    Part("Find the x-intercepts.", answer=Math("x = 1, 5")),
-                    Part("Find the y-intercept.", answer=Math("(0, -10)")),
-                ],
-            ),
-        ),
-        Part(
-            "State the range of $f$.",
-            answer=Math("(-infinity, 8]"),
-            answer_space="0.8in",
-        ),
-    ],
-    layout=PartsGrid(columns=1, answer_space="0.8in"),
-    points=10,
-)
-```
-
-This renders as:
-
-```
-1.  Let f(x) = -2(x-3)² + 8.
-
-    a.  Find the key features of f.
-
-        ┌─────────────────────────┬─────────────────────────┐
-        │ i.  State the vertex.   │ ii. State the axis …    │
-        │                         │                         │
-        │iii. Find the x-intercepts│ iv. Find the y-intercept│
-        │                         │                         │
-        └─────────────────────────┴─────────────────────────┘
-
-    b.  State the range of f.
-```
-
-Set `indent=False` on any `Parts` node to suppress the automatic left-padding.
-
----
-
-## Public API
-
-```python
-# Documents
-Test(title, course="", version="")
-Problem(prompt, answer=None, answer_space="1in", points=None, keep_together=True)
-MultipartProblem(prompt, parts, layout=None, figure=None, figure_layout=None, points=None, keep_together=True)
-
-# Core document node (returned by Problem and MultipartProblem)
-Block(stem, body, answer=None, figure=None, figure_layout=None, points=None, keep_together=True)
-
-# Part body types
-FreeResponse(height="1in")
-Parts(parts, layout=None, labels="alpha", indent=True)
-
-# Parts
-Part(prompt, body=None, answer=None, answer_space=None)
-# body defaults to FreeResponse(answer_space or "1in")
-# body can be FreeResponse or Parts for nested sub-parts
-
-# Layout
-PartsGrid(columns=1, answer_space="1in")
-SideFigure(position="right", width="42%")
-AnswerSpace(height="1in")
-
-# Content
-Text("plain text")
-Math(r"x^2 - 4")          # Typst math syntax
-RawTypst("#v(0.5in)")      # raw Typst escape hatch
-Figure("path/to/file.svg")
-
-# Problem library
-ProblemLibrary("./problems")
-@problem(id, tags, topic, description, difficulty, course)
-lib.search(tags, topic, course, difficulty, keywords)
-lib.get("problem_id").build(**kwargs)
-lib.build_catalog("catalog.json")
-
-# Renderer (advanced)
-quiz.to_typst(mode="student")
-quiz.write_typst(out_dir, mode)
-quiz.build(out_dir)
-```
-
-### Label schemes
+Label scheme for parts is set on the `Parts` container:
 
 | `labels=`   | Output         |
 |-------------|----------------|
@@ -259,11 +228,43 @@ quiz.build(out_dir)
 | `"roman"`   | i, ii, iii, …  |
 | `"numeric"` | 1, 2, 3, …     |
 
+Parametrize problems via keyword args so the same template can produce
+different versions:
+
+```python
+@problem(id="alg_factor_001", ...)
+def alg_factor_001(leading_coeff=2, roots=None):
+    roots = roots if roots is not None else [3, -2]
+    ...
+```
+
+Then call `lib.get("alg_factor_001").build(leading_coeff=3, roots=[1, -4])`.
+
+See [problems/calculus/derivatives.py](problems/calculus/derivatives.py) and
+[problems/algebra/polynomials.py](problems/algebra/polynomials.py) for full
+working examples.
+
+---
+
+## CLI cheat sheet
+
+```bash
+mathpaper check-typst                          # verify typst is on PATH
+mathpaper index ./problems                     # rebuild problems/catalog.json
+mathpaper search ./problems --tag derivatives  # search the library
+mathpaper explore ./problems                   # open browser test builder
+mathpaper build path/to/quiz.py                # run a build script
+mathpaper build path/to/quiz.py --no-render-figures   # reuse cached figures
+mathpaper history --course Calculus            # show problems you've used
+```
+
 ---
 
 ## Figures
 
-The primary figure backend is **ManimCE**. Figures are rendered as static PNGs (last frame), white-background cropped, and cached in `.mathpaper_cache/figures/`.
+The primary figure backend is **Manim**. Figures render to PNG (last frame
+of the scene), are auto-cropped, and cached under `.mathpaper_cache/figures/`
+keyed by the scene class qualname.
 
 ```python
 from mathpaper.figures.manim import ManimFigure
@@ -277,28 +278,14 @@ class CircleFigure(ManimFigure):
         super().__init__(_Scene, "circle.png", width)
 ```
 
-Skip re-rendering and use the cached version:
+Skip re-rendering when iterating on a quiz:
 
 ```bash
-MATHPAPER_NO_RENDER_FIGURES=1 python my_quiz.py
-# or
 mathpaper build my_quiz.py --no-render-figures
+# or:  MATHPAPER_NO_RENDER_FIGURES=1 python my_quiz.py
 ```
 
-Matplotlib SVG is also supported for simpler graphs (`mathpaper.figures.matplotlib`).
-
----
-
-## Examples
-
-| Example | File |
-|---|---|
-| Algebra 2 polynomial quiz (with nested sub-parts) | [examples/algebra_2/polynomial_quiz.py](examples/algebra_2/polynomial_quiz.py) |
-| Calculus problem library | [problems/calculus/derivatives.py](problems/calculus/derivatives.py) |
-
-```bash
-python examples/algebra_2/polynomial_quiz.py
-```
+`MatplotlibFigure` (SVG output) is also available for simpler plots.
 
 ---
 
@@ -306,9 +293,32 @@ python examples/algebra_2/polynomial_quiz.py
 
 ```bash
 conda activate mathpaper-dev
-pytest
-ruff check src/
+pytest -q                       # run the test suite
+ruff check src/                 # lint
+pre-commit install              # install hook so tests run before commits to main
 ```
+
+The `pre-commit` hook runs `pytest` automatically only when committing to
+`main`. On any other branch it skips, so you can commit work-in-progress
+freely.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `mathpaper: command not found` | conda env not active | `conda activate mathpaper-dev` |
+| `ModuleNotFoundError: mathpaper` | running outside the conda env, or editable install missing | `conda activate mathpaper-dev`, then `pip install -e .` |
+| `typst not found on PATH` | Typst not installed | `brew install typst` (or download a release binary) |
+| Browser app: `streamlit not found` | optional deps not installed | `pip install ".[explore]"` |
+| Browser app: "preview failed" | typst missing | `mathpaper check-typst` |
+| Manim figure errors on first run | `manim` not installed | `pip install ".[manim]"` |
+| Build is slow on each run | re-rendering figures every time | add `--no-render-figures` once cached |
+| `ChunkType … appeared before IHDR` from Typst | corrupt PNG in `assets/` | delete `.mathpaper_cache/figures/` and rebuild |
+| Tests didn't run before commit | `pre-commit` not installed | `pre-commit install` (one-time) |
+
+---
 
 ## License
 

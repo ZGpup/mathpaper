@@ -12,6 +12,9 @@ class Test:
     version: str = ""
     _blocks: list[Any] = field(default_factory=list, repr=False)
 
+    # Tell pytest this is not a test class.
+    __test__ = False
+
     def add(self, block: Any) -> None:
         self._blocks.append(block)
 
@@ -56,7 +59,11 @@ class Test:
             "version": self.version,
             "created_by": f"mathpaper {mathpaper.__version__}",
             "problems": [
-                {"index": i + 1, "type": type(b).__name__}
+                {
+                    "index": i + 1,
+                    "body": type(getattr(b, "body", b)).__name__,
+                    "points": getattr(b, "points", None),
+                }
                 for i, b in enumerate(self._blocks)
             ],
         }

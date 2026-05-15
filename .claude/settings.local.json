@@ -4,7 +4,9 @@
       "Bash(rtk find *)",
       "Bash(rtk ls *)",
       "Bash(rtk grep *)",
-      "Bash(rtk wc *)"
+      "Bash(rtk wc *)",
+      "Bash(rtk read *)",
+      "Bash(conda run *)"
     ]
   }
 }
