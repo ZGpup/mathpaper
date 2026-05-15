@@ -73,6 +73,20 @@ def _cmd_explore(args) -> None:
         sys.exit(1)
 
 
+def _cmd_build(args) -> None:
+    script = Path(args.script)
+    if not script.exists():
+        print(f"Error: script '{script}' does not exist", file=sys.stderr)
+        sys.exit(1)
+
+    env = {**__import__("os").environ}
+    if args.no_render_figures:
+        env["MATHPAPER_NO_RENDER_FIGURES"] = "1"
+
+    result = subprocess.run([sys.executable, str(script)], env=env)
+    sys.exit(result.returncode)
+
+
 def _cmd_history(args) -> None:
     from mathpaper.library.usage import read_usage
 
@@ -91,6 +105,15 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command")
 
     sub.add_parser("check-typst", help="Check that typst is installed and on PATH")
+
+    p_build = sub.add_parser("build", help="Run a mathpaper build script")
+    p_build.add_argument("script", help="Path to the Python build script")
+    p_build.add_argument(
+        "--no-render-figures",
+        action="store_true",
+        dest="no_render_figures",
+        help="Skip figure rendering; reuse cached PNGs from .mathpaper_cache/figures/",
+    )
 
     p_index = sub.add_parser("index", help="Build catalog.json from a problems directory")
     p_index.add_argument("path", nargs="?", default="./problems", help="Path to problems directory")
@@ -113,6 +136,7 @@ def main() -> None:
 
     dispatch = {
         "check-typst": _cmd_check_typst,
+        "build": _cmd_build,
         "index": _cmd_index,
         "search": _cmd_search,
         "explore": _cmd_explore,
