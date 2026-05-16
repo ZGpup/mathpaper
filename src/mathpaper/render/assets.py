@@ -30,4 +30,4 @@ def _walk(node, assets_dir: Path) -> None:
 def _copy_figure(figure: "Figure", assets_dir: Path) -> None:
     src = Path(figure.path)
     if src.exists():
-        shutil.copy2(src, assets_dir / src.name)
+        shutil.copy2(src, assets_dir / figure.asset_name)
