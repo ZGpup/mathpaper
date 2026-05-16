@@ -1,14 +1,15 @@
 """Tests for the @problem decorator and ProblemLibrary."""
+import json
 import textwrap
 
 import pytest
 
-from mathpaper import Block
+from mathpaper import TemplatedProblem
 from mathpaper.library import ProblemLibrary, ProblemDef
 
 
 _PROBLEM_FILE = textwrap.dedent("""
-    from mathpaper import Problem, Text
+    from mathpaper import TemplatedProblem
     from mathpaper.library import problem
 
     @problem(
@@ -20,7 +21,7 @@ _PROBLEM_FILE = textwrap.dedent("""
         course="UnitTest",
     )
     def test_p_001(answer_text="hello"):
-        return Problem(prompt=Text(answer_text))
+        return TemplatedProblem(points=1, context={"answer": answer_text})
 
     @problem(
         id="test_p_002",
@@ -31,7 +32,13 @@ _PROBLEM_FILE = textwrap.dedent("""
         course="UnitTest",
     )
     def test_p_002():
-        return Problem(prompt=Text("static"))
+        return TemplatedProblem(points=2, context={})
+""")
+
+_STUB_TYP = textwrap.dedent("""
+    #import "mathpaper.typ": *
+    #let ctx = json("context.json")
+    #problem(number: ctx.number, points: ctx.points)[stub]
 """)
 
 
@@ -40,6 +47,9 @@ def lib_dir(tmp_path):
     pdir = tmp_path / "problems"
     pdir.mkdir()
     (pdir / "demo.py").write_text(_PROBLEM_FILE)
+    # Sibling .typ files for each problem id so build() can resolve them.
+    (pdir / "test_p_001.typ").write_text(_STUB_TYP)
+    (pdir / "test_p_002.typ").write_text(_STUB_TYP)
     return pdir
 
 
@@ -57,16 +67,18 @@ def test_library_get_returns_problemdef(lib_dir):
     assert p.difficulty == "easy"
 
 
-def test_library_build_invokes_function_returns_block(lib_dir):
+def test_library_build_invokes_function_returns_templated(lib_dir):
     lib = ProblemLibrary(lib_dir)
-    block = lib.get("test_p_001").build()
-    assert isinstance(block, Block)
+    prob = lib.get("test_p_001").build()
+    assert isinstance(prob, TemplatedProblem)
+    assert prob.points == 1
+    assert prob.context == {"answer": "hello"}
 
 
 def test_library_build_accepts_kwargs(lib_dir):
     lib = ProblemLibrary(lib_dir)
-    block = lib.get("test_p_001").build(answer_text="custom")
-    assert block.stem.body == "custom"
+    prob = lib.get("test_p_001").build(answer_text="custom")
+    assert prob.context["answer"] == "custom"
 
 
 def test_search_filters_by_tag(lib_dir):
@@ -102,11 +114,25 @@ def test_library_get_unknown_raises_keyerror(lib_dir):
 
 
 def test_build_catalog_writes_json(lib_dir, tmp_path):
-    import json
-
     lib = ProblemLibrary(lib_dir)
     out = tmp_path / "catalog.json"
     lib.build_catalog(out)
     cat = json.loads(out.read_text())
     assert len(cat["problems"]) == 2
     assert {p["id"] for p in cat["problems"]} == {"test_p_001", "test_p_002"}
+
+
+def test_build_rejects_non_templated_return(tmp_path):
+    """A @problem function returning something other than TemplatedProblem should raise."""
+    pdir = tmp_path / "problems"
+    pdir.mkdir()
+    (pdir / "bad.py").write_text(textwrap.dedent("""
+        from mathpaper.library import problem
+
+        @problem(id="bad_001", tags=[], topic="x", description="x", course="x")
+        def bad_001():
+            return "not a TemplatedProblem"
+    """))
+    lib = ProblemLibrary(pdir)
+    with pytest.raises(TypeError):
+        lib.get("bad_001").build()

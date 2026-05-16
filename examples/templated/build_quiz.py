@@ -21,11 +21,12 @@ from pathlib import Path
 from mathpaper import ProblemLibrary, Test
 
 HERE = Path(__file__).parent
+PROBLEMS_DIR = HERE.parent.parent / "problems"
 OUT = HERE / "_out"
 
 
 def main() -> None:
-    lib = ProblemLibrary(HERE / "problems")
+    lib = ProblemLibrary(PROBLEMS_DIR)
 
     quiz = Test(title="Templated Problem Demo", course="Algebra 2 / Calculus", version="A")
     quiz.add(lib.get("polynomial_zeros_001").build())

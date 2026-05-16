@@ -2,177 +2,53 @@
 
 ## Project overview
 
-This project is a Python-first math document generation package that renders directly to Typst. The goal is to make it easy to create polished math tests, quizzes, worksheets, handouts, and answer keys using Python objects rather than hand-written LaTeX or manually inserted screenshots.
+This project is a Python-first math document generation package that renders
+to Typst. The goal is to make it easy to create polished math tests, quizzes,
+worksheets, handouts, and answer keys by pairing hand-authored Typst layouts
+with Python that computes their data (figures, answers, randomized values).
 
 The core idea is:
 
 ```text
-Python object model
-    -> generated figures/assets
-    -> generated Typst source
-    -> Typst PDF output
+Hand-authored .typ layout    (durable, edited with Tinymist)
+       +
+Python @problem function     (computes figure(s) + answer values)
+       ↓
+Per-problem staged subdir    (problem.typ + context.json + assets)
+       ↓
+Typst PDF (student + answer key)
 ```
 
-The package should prioritize reproducibility, clean layout abstractions, reusable problem components, generated answer keys, and easy integration with Python math/graphics tools such as SymPy, NumPy, Matplotlib, Plotly, Manim, and custom SVG generation.
+The package prioritizes reproducibility, reusable problem components,
+generated answer keys, and easy integration with Python math/graphics tools
+such as SymPy, NumPy, Matplotlib, and Manim.
 
-The long-term aim is a publishable Python package for math educators, curriculum writers, and technically inclined teachers who want programmatic control over assessment generation without fighting LaTeX.
-
-## Primary use case
-
-A user should be able to write Python like this:
-
-```python
-from mathpaper import Test, MultipartProblem, Part, Parts, PartsGrid, SideFigure
-from mathpaper.content import Math, Text
-from mathpaper.figures.manim import ManimFigure
-from mathpaper.math import polynomial_from_roots, sympy_to_typst
-
-poly = polynomial_from_roots([-3, 1, 4])
-
-class PolyGraph(ManimFigure):
-    def __init__(self):
-        from manim import Scene, Axes, BLUE
-        class _Scene(Scene):
-            def construct(self):
-                ax = Axes(x_range=[-6, 6], y_range=[-10, 10])
-                self.add(ax, ax.plot(lambda x: (x+3)*(x-1)*(x-4), color=BLUE))
-        super().__init__(_Scene, "poly_graph.png", width="100%")
-
-quiz = Test(
-    title="Polynomial Quiz",
-    course="Algebra 2",
-    version="A",
-)
-
-quiz.add(
-    MultipartProblem(
-        prompt=Text("Use the graph of $f$ to answer the questions."),
-        figure=PolyGraph(),
-        figure_layout=SideFigure(position="right", width="42%"),
-        parts=[
-            Part("Find all real zeros.", answer=Math(r"-3, 1, 4")),
-            Part("Find the y-intercept.", answer=Math(r"12")),
-            Part("State the end behavior."),
-            Part("Where is $f(x) > 0$?"),
-        ],
-        layout=PartsGrid(columns=2, answer_space="0.9in"),
-        points=8,
-    )
-)
-
-quiz.build("out/polynomial_quiz")
-```
-
-Expected output:
-
-```text
-out/polynomial_quiz/
-  main.typ
-  main.pdf
-  answer_key.typ
-  answer_key.pdf
-  assets/
-    poly_graph.png
-  manifest.json
-```
+The long-term aim is a publishable Python package for math educators,
+curriculum writers, and technically inclined teachers who want programmatic
+control over assessment generation without fighting LaTeX.
 
 ## Major design decision
 
-This package uses **Python -> Typst directly**.
+Every problem is a sibling `(.py, .typ)` pair.
+
+- The **`.typ` file** is the durable, hand-edited artifact. It owns layout,
+  typography, spacing, columns, and figure placement. Opened in VSCode with
+  Tinymist for highlighting, autocomplete, hover, and live preview.
+- The **`.py` file** is the Python harness. It computes figures, answers,
+  and any other context values, and ships them to the `.typ` via
+  `context.json`.
 
 Rationale:
 
-- Typst is the actual page/layout/typesetting engine.
-- Direct Typst generation gives better control over tests, worksheets, columns, figures, answer spaces, and page layout.
-- Python should own generation, asset creation, seeding, problem selection, and answer-key construction.
-- Typst should own page layout, typography, grids, spacing, headers, footers, and PDF rendering.
+- Typst is the actual page/layout/typesetting engine. Authoring layouts
+  directly in `.typ` gives the full editor experience and avoids the
+  Python-string-generation tax.
+- Python owns generation, asset creation, seeding, problem selection, and
+  answer-key construction — the parts that benefit from being code.
+- Each staged problem subdir is fully self-contained, so "building a test"
+  is just "pick pre-staged problem subdirs and assemble them."
 
-## Document tree — the recursive Block model
-
-Every item added to `Test.add()` is a `Block`. `Problem` and `MultipartProblem` are plain constructor functions that return `Block`; they are not separate classes. The renderer only needs to handle one type at the top level.
-
-```
-Test._blocks: list[Block]
-
-Block
-  stem: Any                    # the top-level prompt (Text, Math, etc.)
-  body: FreeResponse | Parts   # leaf or recursive container
-  answer: Any | None           # top-level answer for solution mode
-  figure: Any | None           # optional figure (orthogonal to body)
-  figure_layout: Any | None    # SideFigure, etc.
-  points: int | None
-  keep_together: bool
-
-FreeResponse
-  height: str                  # e.g. "1in"
-
-Parts
-  parts: list[Part]
-  layout: Any                  # PartsGrid or None
-  labels: str                  # "alpha" | "roman" | "numeric"
-  indent: bool                 # wrap in #pad(left: 1.5em) when nested; default True
-
-Part
-  prompt: Any
-  body: FreeResponse | Parts   # FreeResponse built in __post_init__ if None
-  answer: Any | None           # shown in solution mode
-  answer_space: str | None     # backwards-compat shorthand → FreeResponse(height)
-```
-
-### Why `Problem` and `MultipartProblem` are functions, not classes
-
-`Problem(...)` returns `Block(stem=prompt, body=FreeResponse(answer_space), ...)`.
-`MultipartProblem(...)` returns `Block(stem=prompt, body=Parts(parts=..., layout=...), ...)`.
-
-All existing call sites are unchanged. The renderer does a single `isinstance(block, Block)` check and then walks `block.body` recursively. Adding a new answer region type (e.g. `MultipleChoice`, `TableResponse`) does not require changes to the problem-level rendering logic.
-
-### Label schemes
-
-The `Parts.labels` field controls the label prefix assigned to each child `Part`. The label is injected by the parent `Parts` container at render time — the `Part` itself is label-agnostic.
-
-| `labels=`   | Output         |
-|-------------|----------------|
-| `"alpha"`   | a, b, c, …     |
-| `"roman"`   | i, ii, iii, …  |
-| `"numeric"` | 1, 2, 3, …     |
-
-### Indentation
-
-When `Part.body` is a `Parts` node and `parts.indent` is `True` (the default), the renderer wraps the sub-block in `#pad(left: 1.5em)[...]`. Each nesting level stacks another 1.5em. Set `indent=False` to suppress.
-
-### Grid layout at any nesting level
-
-`PartsGrid(columns=N)` on a `Parts` node renders its parts in an N-column Typst grid. This works at any depth:
-
-```python
-Part(
-    prompt=Text("Find the key features."),
-    body=Parts(
-        labels="roman",
-        layout=PartsGrid(columns=2, answer_space="0.9in"),
-        parts=[...],   # i, ii in row 1; iii, iv in row 2
-    ),
-)
-```
-
-Produces:
-
-```
-a.  Find the key features.
-
-    ┌──────────────────┬──────────────────┐
-    │ i.  …            │ ii.  …           │
-    │iii.  …           │ iv.  …           │
-    └──────────────────┴──────────────────┘
-```
-
-## TemplatedProblem — the .typ-first authoring path
-
-Alongside the Python recursive-block model, problems can be authored as
-sibling `(.py, .typ)` pairs. The `.typ` file is the durable, hand-edited
-artifact (opened in VSCode with Tinymist for highlighting, autocomplete,
-hover, and live preview); the `.py` file is the Python harness that
-computes the figure(s), the answers, and any other context.
+## TemplatedProblem — the only authoring path
 
 ### Authoring layout
 
@@ -231,6 +107,22 @@ The helper library (`src/mathpaper/templates/typst/lib.typ`) provides:
 use Typst's native `+` enum with `#set enum(numbering: ...)` — it
 auto-indents and auto-labels at any depth.
 
+### Building a test
+
+```python
+from mathpaper import ProblemLibrary, Test
+
+lib = ProblemLibrary("./problems")
+
+quiz = Test(title="Algebra Quiz", course="Algebra 2", version="A")
+quiz.add(lib.get("polynomial_zeros_001").build())
+quiz.add(lib.get("triangle_rate_001").build())
+quiz.build("out/quiz")
+```
+
+`Test.add()` accepts only `TemplatedProblem` instances (or values produced
+by `ProblemDef.build()`). Anything else raises `TypeError`.
+
 ### Build layout (per-subdir, content-agnostic)
 
 `Test.build()` stages each `TemplatedProblem` into its own subdir, making
@@ -257,78 +149,33 @@ The master `main.typ` `#include`s each subdir's `problem.typ`. This makes
 "building a test" mean "picking pre-staged problem subdirs and assembling
 them" — each problem dir is fully portable.
 
-### Why this exists alongside the Block model
-
-The Block-based `Problem`/`MultipartProblem`/`Parts`/`Part` recursive model
-is still supported. New problems should prefer `TemplatedProblem` because:
-
-- Authoring problems in real `.typ` files gives the full Tinymist editing
-  experience (highlighting, autocomplete, hover, live preview).
-- Python's responsibility shrinks to "compute values + render figures" —
-  no Typst-string-generation logic in the problem author's path.
-- Each staged problem subdir is self-contained, which makes test
-  composition a matter of collecting subdirs.
+### Randomization
 
 Randomization of *values* (zeros, coefficients) is trivial — just vary the
 context dict. Randomization of *structure* (number of parts) is not a
-first-class feature of TemplatedProblem; for structural variants, write
-multiple `.typ` templates and select between them in the `.py` function.
+first-class feature; for structural variants, write multiple `.typ`
+templates and select between them in the `.py` function.
 
-## Public API philosophy
+## Public API
 
-The stable public API should be the **Python object model**, not raw Typst strings.
-
-Stable public API:
+The full stable API:
 
 ```python
 Test(...)
-Block(...)
-Problem(...)          # constructor function → Block (legacy)
-MultipartProblem(...) # constructor function → Block (legacy)
-TemplatedProblem(...) # .typ-first authoring path
-FreeResponse(...)
-Parts(...)
-Part(...)
-PartsGrid(...)
-SideFigure(...)
-AnswerSpace(...)
-Figure(...)
-Math(...)
-Text(...)
-RawTypst(...)
-TypstRenderer(...)
-quiz.to_typst()
-quiz.write_typst(...)
+TemplatedProblem(...)
+ProblemLibrary(...)
+ProblemDef
+@problem(...)            # decorator
+Figure(...)              # base; pass paths/assets straight to Typst
+quiz.add(...)
 quiz.build(...)
 ```
 
-Keep private or explicitly experimental:
-
-```python
-_render_block(...)
-_render_parts_node(...)
-_render_part(...)
-_generate_labels(...)
-_escape_typst_string(...)
-```
-
-### Typst exposure
-
-Typst should not be hidden completely. Advanced users need escape hatches.
-
-Expose:
-
-- `RawTypst(...)` for custom Typst snippets.
-- `quiz.to_typst()` for debugging and inspection.
-- `quiz.write_typst(path)` for writing source without compiling.
-- `TypstRenderer` for advanced renderer control.
-- Optional preamble/template overrides.
-
-But the normal user should rarely need to write raw Typst.
-
 ## Figure backend
 
-The primary figure backend is **ManimCE**. Figures render as static PNGs (last frame of the scene), with white background and automatic whitespace cropping applied. Rendered files are cached in `.mathpaper_cache/figures/`.
+The primary figure backend is **ManimCE**. Figures render as static PNGs
+(last frame of the scene), with white background and automatic whitespace
+cropping applied. Rendered files are cached in `.mathpaper_cache/figures/`.
 
 ### ManimFigure pattern
 
@@ -344,7 +191,13 @@ class MyFigure(ManimFigure):
         super().__init__(_Scene, "my_figure.png", width)
 ```
 
-The inner class closes over constructor parameters. The cache is content-addressed: the cache key is sha1(`construct`'s source + its closure variables). Editing either the construct body OR the constructor arguments invalidates the cache automatically, so the next build re-renders without any manual intervention. Scene classes whose source can't be introspected fall back to a qualname-namespaced cache path (less precise — set `MATHPAPER_FORCE_RENDER_FIGURES=1` to override in that case).
+The inner class closes over constructor parameters. The cache is
+content-addressed: the cache key is sha1(`construct`'s source + its closure
+variables). Editing either the construct body OR the constructor arguments
+invalidates the cache automatically, so the next build re-renders without
+any manual intervention. Scene classes whose source can't be introspected
+fall back to a qualname-namespaced cache path (less precise — set
+`MATHPAPER_FORCE_RENDER_FIGURES=1` to override in that case).
 
 ### Rendering control
 
@@ -356,38 +209,49 @@ MATHPAPER_FORCE_RENDER_FIGURES=1 python my_quiz.py      # ignore cache, re-rende
 mathpaper build my_quiz.py --force-render-figures       # same via CLI flag
 ```
 
-When no cached file exists and rendering is skipped, a gray placeholder PNG is produced automatically.
+When no cached file exists and rendering is skipped, a gray placeholder PNG
+is produced automatically.
 
-Matplotlib SVG is also supported via `mathpaper.figures.matplotlib` for simpler graphs.
+Matplotlib SVG is also supported via `mathpaper.figures.matplotlib` for
+simpler graphs.
 
 ## Problem library and @problem decorator
 
-Problems are `@problem`-decorated functions. The decorator attaches metadata and registers the function in the module's `_PROBLEMS` list. `ProblemLibrary` scans directories, loads files dynamically, and indexes problems by id.
+Problems are `@problem`-decorated functions. The decorator attaches metadata
+and registers the function in the module's `_PROBLEMS` list. `ProblemLibrary`
+scans directories, loads files dynamically, and indexes problems by id.
 
 ```python
 @problem(
-    id="calc_deriv_poly_001",
-    tags=["calculus", "derivatives"],
-    topic="Derivatives",
-    description="Find f'(x) for a degree-4 polynomial",
-    difficulty="easy",    # "easy" | "medium" | "hard"
+    id="triangle_rate_001",
+    tags=["calculus", "related-rates"],
+    topic="Related Rates",
+    description="Rate of change of triangle area",
+    difficulty="medium",
     course="Calculus",
 )
-def calc_deriv_poly_001(expr=None) -> Problem | MultipartProblem:
+def triangle_rate_001(seed=None) -> TemplatedProblem:
     ...
-    return Problem(...)
+    return TemplatedProblem(context={...}, points=10)
 ```
 
-The function should return a `Problem` or `MultipartProblem` (both produce `Block`). Default parameters serve as the canonical example; callers can override them via `.build(expr=...)`.
+The function must return a `TemplatedProblem`; the decorator raises a
+`TypeError` if anything else is returned. The sibling `{id}.typ` template
+is resolved at decoration time; missing siblings raise `FileNotFoundError`
+when `build()` is called.
 
 ## Planned repository split
 
-Once the engine API is stable, problem content will live in a separate repo (`mathpaper-problems`) that depends on `mathpaper` as a package. The `problems/` directory in this repo is the transitional home for content under development. The `personal/` directory holds private/experimental problems.
+Once the engine API is stable, problem content will live in a separate repo
+(`mathpaper-problems`) that depends on `mathpaper` as a package. The
+`problems/` directory in this repo is the transitional home for content
+under development. The `personal/` directory holds private/experimental
+problems.
 
 The split is deferred until the following are stable:
-- The `@problem` return type contract
-- The `Block`/`Parts`/`Part`/`FreeResponse` recursive structure
+- The `TemplatedProblem` context schema conventions
 - The `ManimFigure` cache strategy
+- The per-subdir staging layout
 
 ## Package structure
 
@@ -407,23 +271,12 @@ mathpaper/
     mathpaper/
       __init__.py
       cli.py
-      app.py
+      app.py             # Streamlit-based "mathpaper explore" UI
 
       document/
         __init__.py
-        test.py
-        problem.py       # Block dataclass; Problem() and MultipartProblem() constructors
-        parts.py         # FreeResponse, Parts, Part
-        section.py
-        solution.py
-        layout.py        # PartsGrid, SideFigure, AnswerSpace
-
-      content/
-        __init__.py
-        base.py
-        text.py
-        math.py
-        raw.py
+        test.py          # Test class — stages TemplatedProblems and builds PDFs
+        templated.py     # TemplatedProblem dataclass
 
       math/
         __init__.py
@@ -447,11 +300,9 @@ mathpaper/
 
       render/
         __init__.py
-        typst.py          # TypstRenderer; recursive _render_parts_node/_render_part
-        compiler.py
-        escaping.py
-        assets.py
-        context.py
+        compiler.py       # typst compile + availability check
+        escaping.py       # escape_typst_text helper
+        templated.py      # per-subdir staging + master main.typ rendering
 
       library/
         __init__.py
@@ -461,16 +312,7 @@ mathpaper/
 
       templates/
         typst/
-          lib.typ
-          page.typ
-          problems.typ
-          parts.typ
-          figures.typ
-          solutions.typ
-          themes/
-            default.typ
-            compact.typ
-            exam.typ
+          lib.typ         # helper library shipped to every staged subdir
 
       utils/
         __init__.py
@@ -479,14 +321,12 @@ mathpaper/
         cache.py
 
   examples/
-    algebra_2/
-      polynomial_quiz.py  # includes nested sub-parts demo (Parts(labels="roman", columns=2))
-  problems/
-    calculus/
-      derivatives.py
-  personal/
-    test3/
-      scratch.py
+    templated/
+      build_quiz.py
+      problems/
+        polynomial_zeros_001.py / .typ
+        triangle_rate_001.py / .typ
+        mathpaper.typ   # local copy for Tinymist preview
 ```
 
 ## Development environment
@@ -498,7 +338,9 @@ conda activate mathpaper-dev
 python3 ...
 ```
 
-The package is installed in editable mode there (`pip install -e .`), so imports like `from mathpaper import ...` resolve correctly. Running Python outside this environment will fail with import errors.
+The package is installed in editable mode there (`pip install -e .`), so
+imports like `from mathpaper import ...` resolve correctly. Running Python
+outside this environment will fail with import errors.
 
 ## Dependencies
 
@@ -523,59 +365,60 @@ Optional:
 
 - `manim` (primary figure backend)
 - `plotly` + `kaleido`
+- `streamlit` + `pymupdf` (for the `mathpaper explore` browser app)
 
-Typst is assumed to be installed separately and available on `PATH` as `typst`.
+Typst is assumed to be installed separately and available on `PATH` as
+`typst`.
 
 ## Development principles
 
-1. Build the object model first.
-2. Keep Typst generation direct and inspectable.
+1. Hand-authored `.typ` files own layout; Python owns data and figures.
+2. Each problem stages into a self-contained subdir.
 3. Use Typst for layout; use Python for generation.
 4. Prefer vector graphics; Manim is the primary figure backend.
-5. Make answer keys first-class.
+5. Make answer keys first-class (driven by a single solution-mode flag).
 6. Make deterministic randomization easy.
-7. Do not add Quarto to the core pipeline.
-8. Keep raw Typst available as an advanced escape hatch.
-9. Keep early scope small but design for expansion.
-10. The document tree is recursive — `Part.body` can be `FreeResponse` or `Parts`.
-
-## Two authoring paths
-
-- **Block model** (legacy): Python `Problem`/`MultipartProblem`/`Parts`/`Part`
-  build a recursive document tree; the renderer emits Typst from Python.
-  Existing problems use this; it remains fully supported.
-- **TemplatedProblem** (preferred for new work): a sibling `.py`/`.typ` pair.
-  The `.typ` is hand-authored and edited with Tinymist; the `.py` produces a
-  context dict consumed by `json("context.json")` inside the `.typ`. Build
-  output uses a per-subdir layout (`out/problem_001/`, `out/problem_002/`, …).
-
-A single `Test` must use only one path — mixing `Block`s and
-`TemplatedProblem`s in one test raises `TypeError`.
+7. Keep early scope small but design for expansion.
 
 ## Resolved design decisions
 
-- **`Problem` and `MultipartProblem` are constructor functions, not classes.** Both return `Block`. The renderer handles one type.
-- **The document tree is recursive.** `Part.body` is either `FreeResponse` (leaf) or `Parts` (nested). Label scheme (`alpha`, `roman`, `numeric`) lives on the `Parts` container, not on individual `Part` objects.
-- **Indentation at each nesting level.** `Parts.indent=True` (default) wraps the sub-block in `#pad(left: 1.5em)` in Typst. Stacks automatically with depth.
-- **Grid layout works at any nesting depth.** `PartsGrid(columns=N)` on an inner `Parts` node produces a multi-column grid inside an indented block.
-- **Manim is the primary figure backend.** PNG output, white background, auto-cropped, cached in `.mathpaper_cache/figures/`.
-- **`Part.answer_space` is a backwards-compatible shorthand.** It initializes `Part.body = FreeResponse(answer_space)` in `__post_init__`. Existing problem code is unaffected.
-- **Manim figure cache is content-addressed.** Cache key is sha1(construct's source + closure values), so edits to the scene body or constructor args invalidate the cache automatically. `MATHPAPER_FORCE_RENDER_FIGURES=1` is the always-available override.
+- **Single authoring path.** Every problem is a sibling `(.py, .typ)`
+  pair returning a `TemplatedProblem`. The previous Python-recursive
+  `Block`/`Problem`/`MultipartProblem`/`Parts`/`Part` model has been
+  removed.
+- **Per-subdir staging.** Each problem stages into `problem_NNN/` with
+  its own `problem.typ`, `context.json`, helper lib, and figure assets.
+  This makes problems portable and tests composable.
+- **Solution mode is a single Typst state.** `set-solution-mode(true)` in
+  the master `answer_key.typ` flips `#if-solution[...]` blocks on across
+  every staged problem; `answer-space(...)` collapses to zero in solution
+  mode automatically.
+- **Manim is the primary figure backend.** PNG output, white background,
+  auto-cropped, cached in `.mathpaper_cache/figures/`.
+- **Manim figure cache is content-addressed.** Cache key is sha1(construct's
+  source + closure values), so edits to the scene body or constructor args
+  invalidate the cache automatically. `MATHPAPER_FORCE_RENDER_FIGURES=1`
+  is the always-available override.
 
 ## Open design questions
 
-- Should `Math(...)` accept LaTeX-like syntax and convert to Typst math, or should users write Typst math directly? (Currently: Typst math directly.)
 - Should answer keys mirror student layout or use a compact solution layout?
-- How should custom themes be defined: Python objects, Typst overrides, or both?
+- How should custom themes be defined: Python objects, Typst overrides, or
+  both?
 - Should figure generation be eager or lazy?
-- Should problem generators live in the main package or in optional curriculum modules? (Planned: separate `mathpaper-problems` repo.)
-- What is the standard `seed` parameter convention for randomized problem variants?
-- Should `MultipleChoice`, `TableResponse`, and other answer region types be added? (Planned, not yet implemented.)
+- Should problem generators live in the main package or in optional
+  curriculum modules? (Planned: separate `mathpaper-problems` repo.)
+- What is the standard `seed` parameter convention for randomized problem
+  variants?
 
 ## Current immediate next steps
 
-1. Lock down the `@problem` return type (annotate `-> Block`, validate in decorator).
-2. Add `seed: int | None = None` as a standard `@problem` parameter convention.
-3. Add `MultipleChoiceProblem` / `MultipleChoice` answer region type.
-4. Add `TableResponse` answer region type (fill in a table of values).
-5. Split content into a separate `mathpaper-problems` repository once the above are stable.
+1. Port the legacy reference problems in `examples/` and `problems/` to the
+   `TemplatedProblem` pattern (they remain in-tree as reference material
+   but no longer import successfully against the current API).
+2. Add `seed: int | None = None` as a standard `@problem` parameter
+   convention for randomized variants.
+3. Document the conventions for `context.json` keys (`number`, `points`,
+   `figure`, `answers`).
+4. Split content into a separate `mathpaper-problems` repository once the
+   conventions are stable.

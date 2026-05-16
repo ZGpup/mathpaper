@@ -1,6 +1,21 @@
 {
-  "generated": "2026-05-15T03:49:30.312060+00:00",
+  "generated": "2026-05-16T13:09:46.048024+00:00",
   "problems": [
+    {
+      "id": "alg_cubic_analysis_001",
+      "tags": [
+        "algebra",
+        "cubic",
+        "zeros",
+        "end-behavior",
+        "intervals",
+        "turning-points"
+      ],
+      "topic": "Polynomial Analysis",
+      "description": "Multipart analysis of a cubic: zeros, y-intercept, end behavior, positive intervals, turning points",
+      "difficulty": "medium",
+      "course": "Algebra"
+    },
     {
       "id": "alg_factor_quadratic_001",
       "tags": [
@@ -29,21 +44,6 @@
       "course": "Algebra"
     },
     {
-      "id": "alg_cubic_analysis_001",
-      "tags": [
-        "algebra",
-        "cubic",
-        "zeros",
-        "end-behavior",
-        "intervals",
-        "turning-points"
-      ],
-      "topic": "Polynomial Analysis",
-      "description": "Multipart analysis of a cubic: zeros, y-intercept, end behavior, positive intervals, turning points",
-      "difficulty": "medium",
-      "course": "Algebra"
-    },
-    {
       "id": "alg_vertex_form_001",
       "tags": [
         "algebra",
@@ -56,6 +56,35 @@
       "description": "Vertex-form quadratic: describe transformations and find key features with nested sub-parts",
       "difficulty": "medium",
       "course": "Algebra"
+    },
+    {
+      "id": "calc_curve_analysis_001",
+      "tags": [
+        "calculus",
+        "derivatives",
+        "critical-points",
+        "concavity",
+        "monotone-intervals",
+        "inflection-points"
+      ],
+      "topic": "Curve Analysis",
+      "description": "Find increasing/decreasing intervals, concavity, and classify critical points for a degree-4 polynomial",
+      "difficulty": "hard",
+      "course": "Calculus"
+    },
+    {
+      "id": "calc_deriv_drill_001",
+      "tags": [
+        "calculus",
+        "derivatives",
+        "logarithmic",
+        "chain-rule",
+        "inverse-trig"
+      ],
+      "topic": "Derivatives",
+      "description": "Five-part differentiation drill: log rules, log base-b, arcsin, chain rule, quotient with arccos",
+      "difficulty": "medium",
+      "course": "Calculus"
     },
     {
       "id": "calc_deriv_poly_001",
@@ -96,32 +125,6 @@
       "course": "Calculus"
     },
     {
-      "id": "calc_implicit_mixed_001",
-      "tags": [
-        "calculus",
-        "implicit-differentiation",
-        "exponential"
-      ],
-      "topic": "Implicit Differentiation",
-      "description": "Implicit differentiation of a complex mixed-exponent curve",
-      "difficulty": "hard",
-      "course": "Calculus"
-    },
-    {
-      "id": "calc_deriv_drill_001",
-      "tags": [
-        "calculus",
-        "derivatives",
-        "logarithmic",
-        "chain-rule",
-        "inverse-trig"
-      ],
-      "topic": "Derivatives",
-      "description": "Five-part differentiation drill: log rules, log base-b, arcsin, chain rule, quotient with arccos",
-      "difficulty": "medium",
-      "course": "Calculus"
-    },
-    {
       "id": "calc_implicit_drill_001",
       "tags": [
         "calculus",
@@ -135,17 +138,14 @@
       "course": "Calculus"
     },
     {
-      "id": "calc_curve_analysis_001",
+      "id": "calc_implicit_mixed_001",
       "tags": [
         "calculus",
-        "derivatives",
-        "critical-points",
-        "concavity",
-        "monotone-intervals",
-        "inflection-points"
+        "implicit-differentiation",
+        "exponential"
       ],
-      "topic": "Curve Analysis",
-      "description": "Find increasing/decreasing intervals, concavity, and classify critical points for a degree-4 polynomial",
+      "topic": "Implicit Differentiation",
+      "description": "Implicit differentiation of a complex mixed-exponent curve",
       "difficulty": "hard",
       "course": "Calculus"
     }

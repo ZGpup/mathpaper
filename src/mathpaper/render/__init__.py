@@ -1,3 +1,3 @@
-from mathpaper.render.typst import TypstRenderer
+from mathpaper.render.compiler import compile_typst, typst_available
 
-__all__ = ["TypstRenderer"]
+__all__ = ["compile_typst", "typst_available"]

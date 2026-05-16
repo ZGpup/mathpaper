@@ -10,7 +10,7 @@ _PROBLEMS_DEFAULT = Path.cwd() / "problems"
 def _render_preview_pdf(defn) -> bytes | None:
     """Build a single-problem PDF and return the raw bytes."""
     try:
-        from mathpaper import Test, Text
+        from mathpaper import Test
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "preview"

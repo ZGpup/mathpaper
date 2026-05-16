@@ -175,29 +175,22 @@ def test_test_build_assembles_per_subdir_layout(problem_dir, tmp_path):
     assert "set-solution-mode(true)" in key_src
 
 
-def test_test_build_rejects_mixed_block_and_templated(problem_dir, tmp_path):
-    """Mixed lists are not supported — clean error rather than silent breakage."""
-    from mathpaper import Problem, Text
-
-    lib = ProblemLibrary(problem_dir)
-    quiz = Test(title="Mixed", course="UT")
-    quiz.add(lib.get("demo_templated_001").build())
-    quiz.add(Problem(prompt=Text("legacy"), points=1))
-
+def test_test_add_rejects_non_templated_block():
+    """Test.add only accepts TemplatedProblem — anything else is a TypeError."""
+    quiz = Test(title="Bad")
     with pytest.raises(TypeError):
-        quiz.build(tmp_path / "build")
+        quiz.add("not a problem")
 
 
-def test_manifest_records_templated_kind(problem_dir, tmp_path):
+def test_manifest_records_templated_problems(problem_dir, tmp_path):
     lib = ProblemLibrary(problem_dir)
     quiz = Test(title="T", course="UT")
     quiz.add(lib.get("demo_templated_001").build())
     quiz.build(tmp_path / "build")
 
     manifest = json.loads((tmp_path / "build" / "manifest.json").read_text())
-    assert manifest["templated"] is True
-    assert manifest["problems"][0]["kind"] == "templated"
     assert manifest["problems"][0]["points"] == 5
+    assert manifest["problems"][0]["template"].endswith("demo_templated_001.typ")
 
 
 @pytest.mark.skipif(not typst_available(), reason="typst not on PATH")

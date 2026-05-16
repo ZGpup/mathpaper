@@ -1,1 +1,0 @@
-"""Geometry triangle worksheet example."""

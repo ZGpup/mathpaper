@@ -1,33 +1,31 @@
-"""Algebra 1 example — basic linear equations worksheet."""
-from mathpaper import Test, Problem, MultipartProblem, Part, Text, Math, AnswerSpace, PartsGrid
+"""Build the Algebra 1 linear equations worksheet from the problems library.
 
-quiz = Test(title="Linear Equations Worksheet", course="Algebra 1")
+Usage::
 
-quiz.add(Problem(
-    prompt=Text("Solve for x:  2x + 5 = 13"),
-    answer=Math("x = 4"),
-    answer_space="1in",
-    points=3,
-))
+    conda activate mathpaper-dev
+    python examples/algebra_1/build.py
 
-quiz.add(Problem(
-    prompt=Text("Solve for x:  3(x - 2) = 9"),
-    answer=Math("x = 5"),
-    answer_space="1in",
-    points=3,
-))
+Outputs to ``out/algebra_1/``.
+"""
+from __future__ import annotations
 
-quiz.add(MultipartProblem(
-    prompt=Text("Consider the equation  y = 2x - 1."),
-    parts=[
-        Part("Find the slope.", answer=Math("2")),
-        Part("Find the y-intercept.", answer=Math("-1")),
-        Part("Graph the equation on the axes below."),
-        Part("Find x when y = 7.", answer=Math("x = 4")),
-    ],
-    layout=PartsGrid(columns=2, answer_space="1in"),
-    points=8,
-))
+from pathlib import Path
 
-quiz.build("out/algebra_1")
-print("Built to out/algebra_1/")
+from mathpaper import ProblemLibrary, Test
+
+PROBLEMS_DIR = Path(__file__).parent.parent.parent / "problems" / "algebra"
+
+
+def main() -> None:
+    lib = ProblemLibrary(PROBLEMS_DIR)
+
+    quiz = Test(title="Linear Equations Worksheet", course="Algebra 1")
+    quiz.add(lib.get("alg_linear_solve_001").build())
+    quiz.add(lib.get("alg_linear_solve_002").build())
+    quiz.add(lib.get("alg_linear_analysis_001").build())
+    quiz.build("out/algebra_1")
+    print("Built to out/algebra_1/")
+
+
+if __name__ == "__main__":
+    main()

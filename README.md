@@ -1,11 +1,13 @@
 # mathpaper
 
 A Python-first toolkit for building math tests, quizzes, and worksheets.
-Pick problems from a tagged library, arrange them in a quiz, and produce
-a print-ready PDF and answer key — in code or in a browser.
+Author each problem as a sibling `.py` / `.typ` pair: the `.typ` owns the
+layout, Python owns the figures and answers. Pick problems from a tagged
+library, assemble them into a quiz, and produce a print-ready PDF and
+answer key.
 
 ```
-Python objects  →  Typst source  →  PDF (student + answer key)
+Hand-authored .typ  +  Python @problem fn  →  Staged subdirs  →  PDF (student + answer key)
 ```
 
 ---
@@ -80,18 +82,14 @@ python personal/algebra2_unit3/quiz_polynomials.py
 Output PDFs land in whatever directory the script passes to `quiz.build(...)`
 (by convention, `out/<name>/`).
 
-> If you'd rather keep your quizzes outside this repo, point a script in
-> any directory at the installed package — `from mathpaper import Test, ...`
-> works as long as `mathpaper-dev` is active. Only the `personal/` folder
-> convention matters here; the package itself doesn't care about location.
-
 ---
 
 ## 3. Using the problem library
 
 `problems/` holds reusable, tagged problem generators. Each one is a Python
-function decorated with `@problem(...)`. The library indexes them by id, tag,
-topic, difficulty, and course.
+function decorated with `@problem(...)` that returns a `TemplatedProblem`,
+paired with a sibling `.typ` file of the same name. The library indexes
+the Python functions by id, tag, topic, difficulty, and course.
 
 You have three ways to use the library.
 
@@ -145,6 +143,8 @@ quiz.build("out/derivatives_quiz")
 #   out/derivatives_quiz/main.pdf          ← student version
 #   out/derivatives_quiz/answer_key.typ
 #   out/derivatives_quiz/answer_key.pdf    ← answer key (computed)
+#   out/derivatives_quiz/mathpaper.typ
+#   out/derivatives_quiz/problem_001/...   ← one subdir per problem
 #   out/derivatives_quiz/manifest.json
 ```
 
@@ -161,14 +161,20 @@ quiz.add(lib.get("calc_deriv_poly_001").build(expr=x**3 - 3*x))
 
 ## 4. Writing a new problem
 
-Drop a `@problem`-decorated function into any `.py` file under `problems/`.
-Run `mathpaper index ./problems` afterward (or just restart the browser app)
-and it appears in search immediately.
+A problem is a sibling `(.py, .typ)` pair under `problems/`:
+
+```
+problems/calculus/
+  my_problem.py
+  my_problem.typ
+```
+
+### The .py file
 
 ```python
-# problems/calculus/my_problem.py
+# problems/calculus/calc_deriv_poly_002.py
 from sympy import symbols
-from mathpaper import Math, Problem, Text
+from mathpaper import TemplatedProblem
 from mathpaper.library import problem
 from mathpaper.math import sympy_to_typst
 from mathpaper.math.calculus import derivative
@@ -183,65 +189,76 @@ x = symbols("x")
     difficulty="easy",
     course="Calculus",
 )
-def calc_deriv_poly_002(expr=None):
+def calc_deriv_poly_002(expr=None) -> TemplatedProblem:
     e = expr if expr is not None else x**3 - 6*x + 4
-    return Problem(
-        prompt=Text(f"Let $f(x) = {sympy_to_typst(e)}$. Find $f'(x)$."),
-        answer=Math(f"f'(x) = {sympy_to_typst(derivative(e))}"),
-        answer_space="1.2in",
+    return TemplatedProblem(
         points=4,
+        context={
+            "expr": sympy_to_typst(e),
+            "answers": {
+                "derivative": f"f'(x) = {sympy_to_typst(derivative(e))}",
+            },
+        },
     )
+```
+
+### The .typ file
+
+```typst
+// problems/calculus/calc_deriv_poly_002.typ
+#import "mathpaper.typ": *
+#let ctx = json("context.json")
+
+#problem(number: ctx.number, points: ctx.points)[
+  Let $f(x) = #math-from-str(ctx.expr)$. Find $f'(x)$.
+  #answer-space(1.2in)
+  #if-solution[*Answer:* #math-from-str(ctx.answers.derivative)]
+]
 ```
 
 The answer is computed from the expression — change `expr` and both the
 student worksheet and the answer key update automatically.
 
-### Rules for writing a problem (AI-friendly summary)
+### Rules for writing a problem
 
 A `@problem` function must:
 
 1. Be defined in a `.py` file somewhere under `problems/`.
 2. Be decorated with `@problem(id=..., tags=[...], topic=..., description=..., difficulty=..., course=...)`.
 3. Take only keyword arguments (with defaults) so it can be called with no args.
-4. Return either `Problem(...)` or `MultipartProblem(...)` — both return a `Block`.
+4. Return a `TemplatedProblem(...)`.
 5. Have a globally unique `id` (use a stable prefix like `<course>_<topic>_<n>`).
+6. Have a sibling `{id}.typ` file in the same directory.
 
-Inside the function you can use:
+The companion `.typ` file should:
 
-| What you want | What to use |
-|---|---|
-| Plain text prompt | `Text("…")` |
-| Math expression | `Math(r"x^2 + 1")` (Typst math syntax, not LaTeX) |
-| Inline math inside text | put `$…$` directly inside a `Text(...)` string |
-| Convert a SymPy expression to Typst | `sympy_to_typst(expr)` |
-| Single free-response problem | `Problem(prompt=..., answer=..., answer_space="1in", points=N)` |
-| Multipart problem (a, b, c, …) | `MultipartProblem(prompt=..., parts=[Part(...), ...], layout=PartsGrid(columns=2), points=N)` |
-| Nested sub-parts (i, ii, iii inside a) | `Part(prompt=..., body=Parts(labels="roman", layout=PartsGrid(columns=2), parts=[Part(...), ...]))` |
-| Raw Typst escape hatch | `RawTypst("#v(0.5in)")` |
-| Side-by-side figure | pass `figure=...` and `figure_layout=SideFigure(width="40%")` to `MultipartProblem` |
+1. Start with `#import "mathpaper.typ": *` and `#let ctx = json("context.json")`.
+2. Wrap its body in `#problem(number: ctx.number, points: ctx.points)[...]`.
+3. Use `#answer-space(<height>)` for blank response areas — it collapses in
+   solution mode.
+4. Use `#if-solution[...]` to show answers in the answer key only.
+5. Use `#math-from-str(ctx...)` to evaluate context-supplied Typst-math
+   strings as live math.
 
-Label scheme for parts is set on the `Parts` container:
-
-| `labels=`   | Output         |
-|-------------|----------------|
-| `"alpha"`   | a, b, c, …     |
-| `"roman"`   | i, ii, iii, …  |
-| `"numeric"` | 1, 2, 3, …     |
+The helper library (`src/mathpaper/templates/typst/lib.typ`) provides:
+`problem`, `answer-space`, `if-solution`, `set-solution-mode`,
+`parts-grid`, `side-figure`, `math-from-str`. For sequential nested parts
+use Typst's native `+` enum with `#set enum(numbering: "a.")` — it
+auto-indents and auto-labels at any depth.
 
 Parametrize problems via keyword args so the same template can produce
 different versions:
 
 ```python
 @problem(id="alg_factor_001", ...)
-def alg_factor_001(leading_coeff=2, roots=None):
+def alg_factor_001(leading_coeff=2, roots=None) -> TemplatedProblem:
     roots = roots if roots is not None else [3, -2]
     ...
 ```
 
 Then call `lib.get("alg_factor_001").build(leading_coeff=3, roots=[1, -4])`.
 
-See [problems/calculus/derivatives.py](problems/calculus/derivatives.py) and
-[problems/algebra/polynomials.py](problems/algebra/polynomials.py) for full
+See [examples/templated/problems/](examples/templated/problems/) for full
 working examples.
 
 ---
@@ -277,6 +294,18 @@ class CircleFigure(ManimFigure):
                 self.add(Circle(color=BLUE))
         super().__init__(_Scene, "circle.png", width)
 ```
+
+In a `TemplatedProblem`, pass figures via the `figures=[...]` argument and
+reference them by `asset_name` in the context dict:
+
+```python
+return TemplatedProblem(
+    figures=[fig],
+    context={"figure": fig.asset_name, ...},
+)
+```
+
+Inside the `.typ` file: `#image(ctx.figure, width: 100%)`.
 
 Skip re-rendering when iterating on a quiz:
 
@@ -317,7 +346,7 @@ squash merges, and rebases uniformly.
 | Browser app: "preview failed" | typst missing | `mathpaper check-typst` |
 | Manim figure errors on first run | `manim` not installed | `pip install ".[manim]"` |
 | Build is slow on each run | re-rendering figures every time | add `--no-render-figures` once cached |
-| `ChunkType … appeared before IHDR` from Typst | corrupt PNG in `assets/` | delete `.mathpaper_cache/figures/` and rebuild |
+| `ChunkType … appeared before IHDR` from Typst | corrupt PNG in a `problem_NNN/` subdir | delete `.mathpaper_cache/figures/` and rebuild |
 | Tests didn't run before push to main | pre-push hook not installed | `pre-commit install --hook-type pre-push` (one-time) |
 
 ---

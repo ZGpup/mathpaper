@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from mathpaper.document.templated import TemplatedProblem
+
 
 @dataclass
 class ProblemDef:
@@ -18,16 +20,20 @@ class ProblemDef:
     template_path: Path | None = None  # sibling {id}.typ resolved at decoration time
     _fn: Callable[..., Any] = field(default=None, init=False, repr=False)
 
-    def build(self, **kwargs) -> Any:
+    def build(self, **kwargs) -> TemplatedProblem:
         if self._fn is None:
             raise RuntimeError(f"ProblemDef '{self.id}' has no builder attached")
         result = self._fn(**kwargs)
 
-        # Late template resolution: if the function returned a TemplatedProblem
-        # without an explicit template, fill in the sibling .typ resolved at
-        # decoration time.
-        from mathpaper.document.templated import TemplatedProblem
-        if isinstance(result, TemplatedProblem) and result.template is None:
+        if not isinstance(result, TemplatedProblem):
+            raise TypeError(
+                f"Problem '{self.id}' must return a TemplatedProblem, "
+                f"got {type(result).__name__}"
+            )
+
+        # Late template resolution: fill in the sibling .typ resolved at
+        # decoration time, unless the function returned an explicit template.
+        if result.template is None:
             if self.template_path is None:
                 raise FileNotFoundError(
                     f"Problem '{self.id}' returned a TemplatedProblem but no "
@@ -57,13 +63,9 @@ def problem(
 ) -> Callable:
     """Decorate a function to register it as a reusable problem in the library.
 
-    The decorated function may return either:
-      * a ``Block`` (the legacy Python-recursive layout model), or
-      * a ``TemplatedProblem`` whose layout lives in a sibling ``{id}.typ``
-        next to the decorating .py file.
-
-    For TemplatedProblem returns, the sibling template is resolved at decoration
-    time by looking for ``{id}.typ`` in the same directory as the .py file.
+    The decorated function must return a ``TemplatedProblem`` whose layout
+    lives in a sibling ``{id}.typ`` next to the decorating .py file. The
+    sibling template is resolved at decoration time.
     """
     def decorator(fn: Callable) -> Callable:
         template_path = _resolve_sibling_typ(fn, id)
