@@ -592,7 +592,7 @@ exam.add(MultipartProblem(
                 prompt=Text("Uniform continuity of $f$ on $(a, b)$:"),
                 body=Parts(
                     labels="roman",
-                    indent=False,
+                    indent=True,
                     parts=[
                         Part(
                             prompt=Text(
