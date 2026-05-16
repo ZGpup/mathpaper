@@ -1,0 +1,9 @@
+{
+  "figure": "triangle_diagram.png",
+  "answers": {
+    "formula_a": "(d A)/(d t) = (3 cos(theta))/5",
+    "value_b": "(d A)/(d t) = 3/10 \"ft\"^2 \"/\" \"s\""
+  },
+  "number": 2,
+  "points": 10
+}

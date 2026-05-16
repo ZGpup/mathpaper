@@ -1,0 +1,21 @@
+{
+  "title": "Templated Problem Demo",
+  "course": "Algebra 2 / Calculus",
+  "version": "A",
+  "created_by": "mathpaper 0.1.0",
+  "templated": true,
+  "problems": [
+    {
+      "index": 1,
+      "kind": "templated",
+      "template": "/Users/zgilmore/Projects/Personal/mathpaper/examples/templated/problems/polynomial_zeros_001.typ",
+      "points": 12
+    },
+    {
+      "index": 2,
+      "kind": "templated",
+      "template": "/Users/zgilmore/Projects/Personal/mathpaper/examples/templated/problems/triangle_rate_001.typ",
+      "points": 10
+    }
+  ]
+}

@@ -6,6 +6,7 @@ from mathpaper.document.test import Test
 from mathpaper.document.problem import Block, Problem, MultipartProblem
 from mathpaper.document.parts import FreeResponse, Parts, Part
 from mathpaper.document.layout import AnswerSpace, PartsGrid, SideFigure
+from mathpaper.document.templated import TemplatedProblem
 from mathpaper.content.text import Text
 from mathpaper.content.math import Math
 from mathpaper.content.raw import RawTypst
@@ -24,6 +25,7 @@ __all__ = [
     "AnswerSpace",
     "PartsGrid",
     "SideFigure",
+    "TemplatedProblem",
     "Text",
     "Math",
     "RawTypst",

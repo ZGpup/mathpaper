@@ -5,7 +5,12 @@ import matplotlib.pyplot as plt
 import pytest
 
 from mathpaper.figures.base import Figure
-from mathpaper.figures.manim import ManimFigure, _cache_path
+from mathpaper.figures.manim import (
+    ManimFigure,
+    _cache_path,
+    _content_cache_path,
+    _resolve_cache_path,
+)
 from mathpaper.figures.matplotlib import MatplotlibFigure
 
 
@@ -14,6 +19,22 @@ def test_figure_to_typst_emits_image_call():
     out = f.to_typst()
     assert '#image("assets/diagram.png"' in out
     assert "width: 60%" in out
+
+
+def test_figure_asset_name_strips_content_hash_prefix():
+    """16-hex-char + underscore prefix from the manim cache is stripped."""
+    f = Figure(path="cache/d33a57ee0a0d5bf4_triangle.png")
+    assert f.asset_name == "triangle.png"
+    assert '#image("assets/triangle.png"' in f.to_typst()
+
+
+def test_figure_asset_name_leaves_normal_names_alone():
+    """A name that just happens to look hex-ish but isn't the right shape stays untouched."""
+    assert Figure(path="cache/diagram.png").asset_name == "diagram.png"
+    # Too short to be a hash prefix
+    assert Figure(path="cache/abc_diagram.png").asset_name == "abc_diagram.png"
+    # 16 chars but contains non-hex
+    assert Figure(path="cache/zzzzzzzzzzzzzzzz_diagram.png").asset_name == "zzzzzzzzzzzzzzzz_diagram.png"
 
 
 def test_matplotlib_figure_renders_svg_to_cache(tmp_path, monkeypatch):
@@ -62,3 +83,65 @@ def test_manim_uses_cached_file_when_present(monkeypatch, tmp_path):
 
     f = ManimFigure(_Cached, "cached.png")
     assert f.path == str(cached)
+
+
+def _build_scene(a, b, label):
+    """Factory that returns a scene class closing over a, b, label."""
+    class _S:
+        def construct(self):
+            return (a, b, label)
+    return _S
+
+
+def test_content_cache_path_changes_with_closure_values():
+    """Same construct body, different closure args → different cache paths."""
+    s1 = _build_scene(2, 3, "x")
+    s2 = _build_scene(4, 5, "x")
+    p1 = _content_cache_path(s1, "fig.png")
+    p2 = _content_cache_path(s2, "fig.png")
+    assert p1 is not None and p2 is not None
+    assert p1 != p2
+
+
+def test_content_cache_path_stable_for_same_closure():
+    """Identical inputs → identical cache path (deterministic)."""
+    s1 = _build_scene(2, 3, "x")
+    s2 = _build_scene(2, 3, "x")
+    assert _content_cache_path(s1, "fig.png") == _content_cache_path(s2, "fig.png")
+
+
+def test_content_cache_path_returns_none_without_construct():
+    class _NoConstruct:
+        pass
+    assert _content_cache_path(_NoConstruct, "fig.png") is None
+
+
+def test_resolve_falls_back_to_qualname_without_construct():
+    class _NoConstruct:
+        __qualname__ = "test_figures._NoConstruct"
+    assert _resolve_cache_path(_NoConstruct, "fig.png") == _cache_path(_NoConstruct, "fig.png")
+
+
+def test_manim_force_render_env_ignores_cache(monkeypatch, tmp_path):
+    """MATHPAPER_FORCE_RENDER_FIGURES=1 bypasses the cache even if the file exists."""
+    pytest.importorskip("PIL")
+
+    class _ForceScene:
+        __qualname__ = "test_figures._ForceScene"
+
+    monkeypatch.chdir(tmp_path)
+    # Pre-populate cache. Without the force env, ManimFigure should reuse this.
+    cached = _resolve_cache_path(_ForceScene, "force.png")
+    cached.parent.mkdir(parents=True, exist_ok=True)
+    cached.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 16)
+
+    # With force=1 and no manim available, ManimFigure tries to render and would
+    # fail. Combining with NO_RENDER_FIGURES=1 makes it take the placeholder
+    # branch instead, which proves the cached-hit branch was skipped.
+    monkeypatch.setenv("MATHPAPER_FORCE_RENDER_FIGURES", "1")
+    monkeypatch.setenv("MATHPAPER_NO_RENDER_FIGURES", "1")
+    f = ManimFigure(_ForceScene, "force.png")
+    assert os.path.exists(f.path)
+    # Placeholder is a real PNG written by Pillow; the seed bytes above are 24 bytes.
+    # If the cache was honored, the file would still be those 24 bytes.
+    assert os.path.getsize(f.path) > 24

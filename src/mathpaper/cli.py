@@ -82,6 +82,8 @@ def _cmd_build(args) -> None:
     env = {**__import__("os").environ}
     if args.no_render_figures:
         env["MATHPAPER_NO_RENDER_FIGURES"] = "1"
+    if args.force_render_figures:
+        env["MATHPAPER_FORCE_RENDER_FIGURES"] = "1"
 
     result = subprocess.run([sys.executable, str(script)], env=env)
     sys.exit(result.returncode)
@@ -113,6 +115,12 @@ def main() -> None:
         action="store_true",
         dest="no_render_figures",
         help="Skip figure rendering; reuse cached PNGs from .mathpaper_cache/figures/",
+    )
+    p_build.add_argument(
+        "--force-render-figures",
+        action="store_true",
+        dest="force_render_figures",
+        help="Ignore the figure cache and re-render every figure from scratch.",
     )
 
     p_index = sub.add_parser("index", help="Build catalog.json from a problems directory")

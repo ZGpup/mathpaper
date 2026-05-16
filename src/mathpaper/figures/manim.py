@@ -1,5 +1,6 @@
 """ManimCE-backed figure base class."""
 import hashlib
+import inspect
 import os
 import shutil
 import tempfile
@@ -12,10 +13,75 @@ _FIGURE_CACHE = Path(".mathpaper_cache/figures")
 
 
 def _cache_path(scene_class: Type, filename: str) -> Path:
+    """Qualname-namespaced cache path. Used as a fallback when the construct
+    source can't be introspected (e.g. C-implemented base classes)."""
     # Namespace by scene class qualname so two figures with the same filename
     # don't collide. sha1[:12] gives 48 bits — negligible collision probability.
     ns = hashlib.sha1(scene_class.__qualname__.encode()).hexdigest()[:12]
     return _FIGURE_CACHE / ns / filename
+
+
+def _construct_source(scene_class: Type) -> str | None:
+    """Return the source of ``scene_class.construct`` if it's introspectable.
+
+    Returns None when the class has no ``construct`` method, or when the
+    source can't be read (e.g. built-in, C-implemented, or REPL-defined).
+    """
+    try:
+        construct = scene_class.construct
+    except AttributeError:
+        return None
+    try:
+        return inspect.getsource(construct)
+    except (OSError, TypeError):
+        return None
+
+
+def _scene_closure_values(scene_class: Type) -> tuple:
+    """Stable tuple of repr() of the construct method's closure cell contents.
+
+    The construct body often closes over constructor arguments of the
+    enclosing ``__init__`` (`a`, `b`, label, etc.); folding these into the
+    cache key means that changing a constructor arg invalidates the cache
+    automatically, the same way changing the construct body does.
+    """
+    try:
+        construct = scene_class.construct
+    except AttributeError:
+        return ()
+    closure = getattr(construct, "__closure__", None) or ()
+    values: list[str] = []
+    for cell in closure:
+        try:
+            v = cell.cell_contents
+        except ValueError:
+            # Empty cell (e.g. cyclic closure that hasn't been bound yet).
+            v = None
+        values.append(repr(v))
+    return tuple(values)
+
+
+def _content_cache_path(scene_class: Type, filename: str) -> Path | None:
+    """Cache path keyed by sha1(construct source + closure values).
+
+    Returns None if the construct source can't be introspected — callers
+    should fall back to the qualname-namespaced ``_cache_path`` in that case.
+    """
+    src = _construct_source(scene_class)
+    if src is None:
+        return None
+    closure_repr = repr(_scene_closure_values(scene_class))
+    payload = (src + "||" + closure_repr).encode()
+    key = hashlib.sha1(payload).hexdigest()[:16]
+    return _FIGURE_CACHE / f"{key}_{filename}"
+
+
+def _resolve_cache_path(scene_class: Type, filename: str) -> Path:
+    """Prefer the content-addressed path; fall back to qualname namespacing."""
+    p = _content_cache_path(scene_class, filename)
+    if p is not None:
+        return p
+    return _cache_path(scene_class, filename)
 
 
 def _make_placeholder(dest: Path) -> Path:
@@ -44,12 +110,18 @@ class ManimFigure(Figure):
     White background and whitespace cropping are applied automatically so the
     PNG asset contains only the diagram content plus a small padding border.
 
-    Rendered files are cached in .mathpaper_cache/figures/<hash>/<filename>.
-    The hash is derived from the scene class's qualified name, so two figures
-    with the same filename but different scene classes will not collide. Set
-    the env var MATHPAPER_NO_RENDER_FIGURES=1 (or use
-    `mathpaper build --no-render-figures`) to skip re-rendering and reuse the
-    cached PNG instead.
+    Rendered files are cached in .mathpaper_cache/figures/. The cache key is
+    content-addressed — sha1 of the construct method's source plus its
+    closure values — so editing either the construct body OR the enclosing
+    constructor arguments invalidates the cache automatically. When the
+    construct source can't be introspected (built-ins, REPL-defined classes),
+    the path falls back to a qualname-namespaced subdir; in that mode set
+    MATHPAPER_FORCE_RENDER_FIGURES=1 to bypass the cache by hand.
+
+    Env vars:
+      MATHPAPER_NO_RENDER_FIGURES=1     skip render, use cached PNG (or a
+                                        placeholder if no cache exists)
+      MATHPAPER_FORCE_RENDER_FIGURES=1  ignore cache, re-render everything
 
     Subclasses define the scene as an inner class inside __init__ so it can
     close over constructor parameters, then call super().__init__().
@@ -65,9 +137,10 @@ class ManimFigure(Figure):
     """
 
     def __init__(self, scene_class: Type, filename: str, width: str = "80%"):
-        cached = _cache_path(scene_class, filename)
+        cached = _resolve_cache_path(scene_class, filename)
+        force = bool(os.environ.get("MATHPAPER_FORCE_RENDER_FIGURES"))
 
-        if cached.exists():
+        if cached.exists() and not force:
             super().__init__(path=str(cached), width=width)
             return
 
