@@ -45,7 +45,7 @@ def _convert_fracs(s: str) -> str:
                             break
                     k += 1
                 den = s[num_end + 2 : k]
-                result.append(f'({num})/({den})')
+                result.append(f'({_convert_fracs(num)})/({_convert_fracs(den)})')
                 i = k + 1
                 continue
 

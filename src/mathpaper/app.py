@@ -64,6 +64,119 @@ def _streamlit_app() -> None:
         initial_sidebar_state="expanded",
     )
 
+    st.markdown(
+        """
+        <style>
+        /* ── background ── */
+        .stApp { background-color: #faf8f4; }
+        [data-testid="stSidebar"] { background-color: #f0ece6; }
+        [data-testid="stSidebar"] [data-testid="stSidebarContent"] { background-color: #f0ece6; }
+
+        /* ── squared corners everywhere ── */
+        .stButton > button,
+        .stDownloadButton > button,
+        [data-testid="stTextInput"] input,
+        [data-testid="stSelectbox"] > div > div,
+        [data-testid="stExpander"],
+        [data-testid="stExpanderDetails"],
+        .stAlert,
+        [data-testid="stFileUploader"],
+        [data-testid="stForm"] {
+            border-radius: 2px !important;
+        }
+
+        /* ── buttons: pastel blue, plain border ── */
+        .stButton > button {
+            background-color: #d6e8f5;
+            border: 1px solid #aac6e0;
+            color: #1e3a50;
+            font-weight: normal;
+        }
+        .stButton > button:hover {
+            background-color: #c2daf0;
+            border-color: #8fb5d8;
+        }
+
+        /* primary button: pastel sage green */
+        .stButton > button[data-testid="baseButton-primary"] {
+            background-color: #c8dfc8;
+            border: 1px solid #9abf9a;
+            color: #1a3320;
+        }
+        .stButton > button[data-testid="baseButton-primary"]:hover {
+            background-color: #b5d4b5;
+        }
+
+        /* download button */
+        .stDownloadButton > button {
+            background-color: #e8dff5;
+            border: 1px solid #c0a8e0;
+            color: #2a1a50;
+            border-radius: 2px !important;
+        }
+
+        /* ── expanders: off-white header, thin border, all states ── */
+        [data-testid="stExpander"] {
+            border: 1px solid #d8cfc4 !important;
+            background-color: #ffffff;
+        }
+        [data-testid="stExpander"] summary,
+        [data-testid="stExpander"] summary:hover,
+        [data-testid="stExpander"] summary:focus,
+        [data-testid="stExpander"] summary:active {
+            background-color: #f5f0ea !important;
+            color: #2a2218 !important;
+        }
+        [data-testid="stExpanderToggleIcon"] { color: #7a6a5a; }
+
+        /* ── inputs & selects ── */
+        [data-testid="stTextInput"] input,
+        [data-testid="stSelectbox"] > div > div {
+            background-color: #ffffff;
+            border: 1px solid #c8bfb4;
+        }
+
+        /* ── info/success/error boxes ── */
+        [data-testid="stAlert"] { border-radius: 2px !important; }
+
+        /* ── image fullscreen button ── */
+        [data-testid="StyledFullScreenButton"],
+        button[title="View fullscreen"] {
+            background-color: #d6e8f5 !important;
+            border: 1px solid #aac6e0 !important;
+            border-radius: 2px !important;
+            color: #1e3a50 !important;
+        }
+        [data-testid="StyledFullScreenButton"]:hover,
+        button[title="View fullscreen"]:hover {
+            background-color: #c2daf0 !important;
+        }
+
+        /* ── dividers: softer ── */
+        hr { border-color: #d8cfc4; }
+
+        /* ── inline code tags (used for topic/difficulty chips) ── */
+        code {
+            background-color: #e8e0d8 !important;
+            color: #2a2218 !important;
+            border-radius: 2px !important;
+            padding: 1px 5px !important;
+        }
+
+        /* ── global text color ── */
+        .stApp, .stApp * {
+            color: #2a2218;
+        }
+        /* inputs need their own override */
+        [data-testid="stTextInput"] input,
+        [data-testid="stSelectbox"] > div > div {
+            color: #2a2218 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     # Determine problems path from CLI arg or default
     problems_path = Path(sys.argv[1]) if len(sys.argv) > 1 else _PROBLEMS_DEFAULT
 
