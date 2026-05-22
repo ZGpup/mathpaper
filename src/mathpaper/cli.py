@@ -89,6 +89,34 @@ def _cmd_build(args) -> None:
     sys.exit(result.returncode)
 
 
+def _cmd_stage(args) -> None:
+    from mathpaper.library import ProblemLibrary
+    from mathpaper.render.templated import stage_templated_problem, stage_root_lib
+
+    script = Path(args.script)
+    if not script.exists():
+        print(f"Error: script '{script}' does not exist", file=sys.stderr)
+        sys.exit(1)
+
+    lib = ProblemLibrary(script)
+    problems = lib.all()
+    if not problems:
+        print(f"Error: no @problem-decorated functions found in '{script}'", file=sys.stderr)
+        sys.exit(1)
+
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stage_root_lib(out_dir)
+
+    for i, defn in enumerate(problems, start=1):
+        built = defn.build()
+        subdir_name = stage_templated_problem(built, out_dir, number=i)
+        staged = out_dir / subdir_name / "problem.typ"
+        print(f"Staged: {staged}")
+
+    print(f"\nOpen a staged problem.typ in Tinymist to preview.")
+
+
 def _cmd_history(args) -> None:
     from mathpaper.library.usage import read_usage
 
@@ -123,6 +151,10 @@ def main() -> None:
         help="Ignore the figure cache and re-render every figure from scratch.",
     )
 
+    p_stage = sub.add_parser("stage", help="Stage a single problem .py into out/preview for Tinymist authoring")
+    p_stage.add_argument("script", help="Path to the problem .py file")
+    p_stage.add_argument("--out", default="out/preview", help="Output directory (default: out/preview)")
+
     p_index = sub.add_parser("index", help="Build catalog.json from a problems directory")
     p_index.add_argument("path", nargs="?", default="./problems", help="Path to problems directory")
 
@@ -145,6 +177,7 @@ def main() -> None:
     dispatch = {
         "check-typst": _cmd_check_typst,
         "build": _cmd_build,
+        "stage": _cmd_stage,
         "index": _cmd_index,
         "search": _cmd_search,
         "explore": _cmd_explore,

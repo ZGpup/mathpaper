@@ -1,0 +1,1 @@
+../src/mathpaper/templates/typst/lib.typ
